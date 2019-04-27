@@ -12,6 +12,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajlada/pajbot2-discord/internal/config"
+	"github.com/pajlada/pajbot2-discord/pkg/utils"
 	"github.com/pajlada/pajbot2/pkg/commandmatcher"
 	"github.com/pajlada/stupidmigration"
 
@@ -133,6 +134,31 @@ func registerCommands() {
 		}
 
 		s.ChannelMessageSend(m.ChannelID, "you are >= admin")
+	})
+
+	commands.Register([]string{"$channels"}, func(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
+		hasAccess, err := memberInRoles(s, m.GuildID, m.Author.ID, miniModeratorRoles)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		if !hasAccess {
+			// No permission
+			return
+		}
+
+		channels, err := s.GuildChannels(m.GuildID)
+		if err != nil {
+			fmt.Println("Error getting channels:", err)
+			return
+		}
+
+		outputs := []string{}
+		for _, channel := range channels {
+			outputs = append(outputs, fmt.Sprintf("[%s] %s = %s\n", getChannelTypeName(channel.Type), channel.ID, channel.Name))
+		}
+
+		utils.SendChunks("```", "```", outputs, m.ChannelID, s)
 	})
 
 	commands.Register([]string{"$roles"}, func(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
@@ -421,5 +447,22 @@ func onMessageReactionRemoved(s *discordgo.Session, m *discordgo.MessageReaction
 			}
 			// s.ChannelMessageSend(m.ChannelID, "removed permission")
 		}
+	}
+}
+
+func getChannelTypeName(channelType discordgo.ChannelType) string {
+	switch channelType {
+	case discordgo.ChannelTypeGuildCategory:
+		return "Category"
+	case discordgo.ChannelTypeGuildText:
+		return "Text"
+	case discordgo.ChannelTypeGuildVoice:
+		return "Voice"
+	case discordgo.ChannelTypeDM:
+		return "DM"
+	case discordgo.ChannelTypeGroupDM:
+		return "Group DM"
+	default:
+		return "unknown"
 	}
 }
