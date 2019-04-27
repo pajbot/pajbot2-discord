@@ -47,6 +47,7 @@ var (
 
 const (
 	// TODO: Make this a choice somewhere :pepega:
+	actionLogChannelID        = `426536548008198144`
 	moderationActionChannelID = `516960063081021460`
 
 	weebChannelID = `500650560614301696`
@@ -267,6 +268,7 @@ func main() {
 	registerCommands()
 
 	bot.AddHandler(onMessage)
+	bot.AddHandler(onMessageDeleted)
 	bot.AddHandler(onUserBanned)
 	bot.AddHandler(onMessageReactionAdded)
 	bot.AddHandler(onMessageReactionRemoved)
@@ -351,6 +353,25 @@ func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 			f(s, m, parts)
 		}
 	}
+}
+
+func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
+	var output string
+	fullMessage, err := s.ChannelMessage(m.ChannelID, m.ID)
+	if err != nil {
+		fmt.Println("Error getting full message")
+	}
+	output += "Message deleted in <#" + m.ChannelID + ">"
+	output += "\nContent: `" + m.ContentWithMentionsReplaced() + "`"
+	output += "\nContent (raw): `" + m.Content + "`"
+	if m.Author != nil {
+		output += "\nAuthor: <@" + m.Author.ID + "> (" + m.Author.Username + " (" + m.Author.ID + "))"
+	}
+	if fullMessage != nil {
+		fmt.Println(fullMessage.Author)
+		fmt.Println(fullMessage.Content)
+	}
+	s.ChannelMessageSend(actionLogChannelID, output)
 }
 
 func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
