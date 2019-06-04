@@ -24,3 +24,7 @@ func (c *cmdChannelInfo) Run(s *discordgo.Session, m *discordgo.MessageCreate, p
 	s.ChannelMessageSend(m.ChannelID, msg)
 	return CommandResultFullCooldown
 }
+
+func (c *cmdChannelInfo) Description() string {
+	return c.Base.Description
+}

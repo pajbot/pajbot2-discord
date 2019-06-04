@@ -92,8 +92,38 @@ func registerCommands() {
 
 	commands.Register([]string{"$ban"}, newBan())
 
+	commands.Register([]string{"$tags"}, newTags())
+
 	commands.Register([]string{"$channelinfo"}, newChannelInfo())
 	commands.Register([]string{"$guildinfo", "$serverinfo"}, newGuildInfo())
+	commands.Register([]string{"$roleinfo"}, newRoleInfo())
+
+	commands.Register([]string{"$modcommands"}, func(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
+		hasAccess, err := memberInRoles(s, m.GuildID, m.Author.ID, miniModeratorRoles)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		if !hasAccess {
+			// No permission
+			return
+		}
+
+		descriptions := []string{}
+
+		commands.ForEach(func(aliases []string, iCmd interface{}) {
+			var description string
+			if cmd, ok := iCmd.(Command); ok {
+				description = fmt.Sprintf("`%s`: %s", aliases, cmd.Description())
+			}
+
+			if description != "" {
+				descriptions = append(descriptions, description)
+			}
+		})
+
+		utils.SendChunks("", "", descriptions, m.ChannelID, s)
+	})
 
 	commands.Register([]string{"$test-minimod"}, func(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
 		hasAccess, err := memberInRoles(s, m.GuildID, m.Author.ID, miniModeratorRoles)

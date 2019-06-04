@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/pajbot/utils"
 	c2 "github.com/pajlada/pajbot2/pkg/commands"
-	"github.com/pajlada/pajbot2/pkg/utils"
 )
 
 var _ Command = &cmdMute{}
@@ -107,4 +107,8 @@ func (c *cmdMute) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	fmt.Println(m.ChannelID, fmt.Sprintf("%s mute %s for %s. reason: %s", m.Author.Mention(), targetID, duration, reason))
 
 	return
+}
+
+func (c *cmdMute) Description() string {
+	return c.Base.Description
 }

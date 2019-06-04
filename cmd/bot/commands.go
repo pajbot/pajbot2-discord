@@ -27,6 +27,7 @@ type Command interface {
 	AddUserIDCooldown(string)
 	AddGlobalCooldown()
 	Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) CommandResult
+	Description() string
 }
 
 var _ Command = &cmdPing{}
@@ -44,4 +45,8 @@ func newPing() *cmdPing {
 func (c *cmdPing) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) CommandResult {
 	s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%s, pong", m.Author.Mention()))
 	return CommandResultFullCooldown
+}
+
+func (c *cmdPing) Description() string {
+	return c.Base.Description
 }

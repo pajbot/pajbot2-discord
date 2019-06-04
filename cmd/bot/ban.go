@@ -53,3 +53,7 @@ func (c *cmdBan) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []s
 
 	return
 }
+
+func (c *cmdBan) Description() string {
+	return c.Base.Description
+}
