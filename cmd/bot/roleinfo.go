@@ -30,7 +30,7 @@ func (c *cmdRoleInfo) Run(s *discordgo.Session, m *discordgo.MessageCreate, part
 		return CommandResultUserCooldown
 	}
 
-	roleName := parts[0]
+	roleName := strings.Join(parts[0:], " ")
 
 	roles, err := s.GuildRoles(m.GuildID)
 	if err != nil {
