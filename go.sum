@@ -68,6 +68,8 @@ github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJ
 github.com/modern-go/reflect2 v1.0.1/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
 github.com/mvdan/xurls v1.1.0/go.mod h1:tQlNn3BED8bE/15hnSL2HLkDeLWpNPAwtw7wkEq44oU=
 github.com/opencontainers/go-digest v1.0.0-rc1/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQYUd2OVphdqWwCJHrFt2s=
+github.com/pajbot/utils v0.0.0-20190525195426-6531d61d5900 h1:iYhXvki+7JEidHQEoVLbNJYVy86qVdkPYfvRvHIWm0w=
+github.com/pajbot/utils v0.0.0-20190525195426-6531d61d5900/go.mod h1:lLYJXlC7fGL4FYvdZk+IQerV5zgwerjIsKDUJNb7LuE=
 github.com/pajlada/botsync v0.0.0-20190419161848-a9c0ed96396a/go.mod h1:0JYKWD7sk1PgdX3Y18hgdx6kBbedo0rc5z/D++d1JLU=
 github.com/pajlada/go-twitch-pubsub v0.0.0-20190126132848-baf7430eb9e5/go.mod h1:dGYg2nHDP/eiV699HP0DN0LjAQi1r1i+VwcBM9wvWyI=
 github.com/pajlada/gobttv v0.0.0-20160914192201-e617d015c333/go.mod h1:KrqJDmVNBYxMfs7wUNVR9hdirZrV9M5jEqGBcjMCMp0=
@@ -123,6 +125,9 @@ golang.org/x/sys v0.0.0-20190322080309-f49334f85ddc h1:4gbWbmmPFp4ySWICouJl6emP0
 golang.org/x/sys v0.0.0-20190322080309-f49334f85ddc/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0 h1:g61tztE5qeGQ89tm6NTjjM9VPIm088od1l6aSorWRWg=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=
+golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=
+golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 golang.org/x/tools v0.0.0-20190110015856-aa033095749b/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 golang.org/x/tools v0.0.0-20190205050122-7f7074d5bcfd/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 golang.org/x/tools v0.0.0-20190322203728-c1a832b0ad89/go.mod h1:LCzVGOaR6xXOjkQ3onu1FJEFr0SW1gC7cKk1uF8kGRs=
