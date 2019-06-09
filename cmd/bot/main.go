@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"regexp"
@@ -357,7 +358,26 @@ func cleanUserID(input string) string {
 	return output
 }
 
+func pushMessageIntoDatabase(m *discordgo.MessageCreate) (err error) {
+	const query = `INSERT INTO discord_messages (id, content) VALUES ($1, $2)`
+	_, err = sqlClient.Exec(query, m.ID, m.Content)
+	return
+}
+
+func getMessageFromDatabase(messageID string) (content string, err error) {
+	const query = `SELECT content FROM discord_messages WHERE id=$1`
+	row := sqlClient.QueryRow(query, messageID)
+	err = row.Scan(&content)
+	return
+}
+
 func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
+	// push message into database
+	err := pushMessageIntoDatabase(m)
+	if err != nil {
+		log.Println("Error pushing message into databasE:", err)
+	}
+
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
@@ -387,19 +407,14 @@ func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 	var output string
-	fullMessage, err := s.ChannelMessage(m.ChannelID, m.ID)
+	messageContent, err := getMessageFromDatabase(m.ID)
 	if err != nil {
 		fmt.Println("Error getting full message")
 	}
 	output += "Message deleted in <#" + m.ChannelID + ">"
-	output += "\nContent: `" + m.ContentWithMentionsReplaced() + "`"
-	output += "\nContent (raw): `" + m.Content + "`"
+	output += "\nContent: `" + messageContent + "`"
 	if m.Author != nil {
 		output += "\nAuthor: <@" + m.Author.ID + "> (" + m.Author.Username + " (" + m.Author.ID + "))"
-	}
-	if fullMessage != nil {
-		fmt.Println(fullMessage.Author)
-		fmt.Println(fullMessage.Content)
 	}
 	s.ChannelMessageSend(actionLogChannelID, output)
 }
