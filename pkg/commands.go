@@ -1,11 +1,6 @@
-package main
+package pkg
 
-import (
-	"fmt"
-
-	"github.com/bwmarrin/discordgo"
-	c2 "github.com/pajlada/pajbot2/pkg/commands"
-)
+import "github.com/bwmarrin/discordgo"
 
 // CommandResult xd
 type CommandResult int
@@ -28,25 +23,4 @@ type Command interface {
 	AddGlobalCooldown()
 	Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) CommandResult
 	Description() string
-}
-
-var _ Command = &cmdPing{}
-
-type cmdPing struct {
-	c2.Base
-}
-
-func newPing() *cmdPing {
-	return &cmdPing{
-		Base: c2.NewBase(),
-	}
-}
-
-func (c *cmdPing) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) CommandResult {
-	s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%s, pong", m.Author.Mention()))
-	return CommandResultFullCooldown
-}
-
-func (c *cmdPing) Description() string {
-	return c.Base.Description
 }

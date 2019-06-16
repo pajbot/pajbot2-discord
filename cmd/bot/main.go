@@ -7,65 +7,35 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"regexp"
 	"syscall"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajlada/pajbot2-discord/internal/config"
-	"github.com/pajlada/pajbot2-discord/pkg/utils"
-	"github.com/pajlada/pajbot2/pkg/commandmatcher"
+	"github.com/pajlada/pajbot2-discord/pkg"
+	"github.com/pajlada/pajbot2-discord/pkg/commands"
 	"github.com/pajlada/stupidmigration"
 
 	_ "github.com/lib/pq"
-)
 
-var (
-	token string
-
-	adminRole         = "104258168128802816"
-	moderatorRole     = "132930561361707010"
-	miniModeratorRole = "531783703882629126"
-	mutedRole         = "431734043881504778"
-
-	adminRoles = []string{
-		adminRole,
-	}
-
-	moderatorRoles = []string{
-		adminRole,
-		moderatorRole,
-	}
-
-	miniModeratorRoles = []string{
-		adminRole,
-		moderatorRole,
-		miniModeratorRole,
-	}
-
-	commands = commandmatcher.NewMatcher()
-)
-
-const (
-	// TODO: Make this a choice somewhere :pepega:
-	actionLogChannelID        = `426536548008198144`
-	moderationActionChannelID = `516960063081021460`
-
-	weebChannelID = `500650560614301696`
+	_ "github.com/pajlada/pajbot2-discord/internal/commands/ban"
+	_ "github.com/pajlada/pajbot2-discord/internal/commands/channelinfo"
+	_ "github.com/pajlada/pajbot2-discord/internal/commands/channels"
+	_ "github.com/pajlada/pajbot2-discord/internal/commands/guildinfo"
+	_ "github.com/pajlada/pajbot2-discord/internal/commands/modcommands"
+	_ "github.com/pajlada/pajbot2-discord/internal/commands/mute"
+	_ "github.com/pajlada/pajbot2-discord/internal/commands/ping"
+	_ "github.com/pajlada/pajbot2-discord/internal/commands/roleinfo"
+	_ "github.com/pajlada/pajbot2-discord/internal/commands/roles"
+	_ "github.com/pajlada/pajbot2-discord/internal/commands/tags"
+	_ "github.com/pajlada/pajbot2-discord/internal/commands/userid"
 )
 
 var sqlClient *sql.DB
 
 func init() {
-	token = os.Getenv("PAJBOT2_DISCORD_BOT_TOKEN")
-
-	if token == "" {
-		fmt.Println("Missing bot token")
-		os.Exit(1)
-	}
-
 	var err error
-	sqlClient, err = sql.Open("postgres", config.GetDSN())
+	sqlClient, err = sql.Open("postgres", config.DSN)
 	if err != nil {
 		fmt.Println("Unable to connect to mysql", err)
 		os.Exit(1)
@@ -82,164 +52,12 @@ func init() {
 		fmt.Println("Unable to run SQL migrations", err)
 		os.Exit(1)
 	}
-}
 
-func registerCommands() {
-	// TODO: unmute
-
-	commands.Register([]string{"$mute"}, newMute())
-
-	commands.Register([]string{"$ping"}, newPing())
-
-	commands.Register([]string{"$ban"}, newBan())
-
-	commands.Register([]string{"$tags"}, newTags())
-
-	commands.Register([]string{"$channelinfo"}, newChannelInfo())
-	commands.Register([]string{"$guildinfo", "$serverinfo"}, newGuildInfo())
-	commands.Register([]string{"$roleinfo"}, newRoleInfo())
-
-	commands.Register([]string{"$modcommands"}, func(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
-		hasAccess, err := memberInRoles(s, m.GuildID, m.Author.ID, miniModeratorRoles)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		if !hasAccess {
-			// No permission
-			return
-		}
-
-		descriptions := []string{}
-
-		commands.ForEach(func(aliases []string, iCmd interface{}) {
-			var description string
-			if cmd, ok := iCmd.(Command); ok {
-				description = fmt.Sprintf("`%s`: %s", aliases, cmd.Description())
-			}
-
-			if description != "" {
-				descriptions = append(descriptions, description)
-			}
-		})
-
-		utils.SendChunks("", "", descriptions, m.ChannelID, s)
-	})
-
-	commands.Register([]string{"$test-minimod"}, func(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
-		hasAccess, err := memberInRoles(s, m.GuildID, m.Author.ID, miniModeratorRoles)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		if !hasAccess {
-			// No permission
-			return
-		}
-
-		s.ChannelMessageSend(m.ChannelID, "you are >= minimod")
-	})
-
-	commands.Register([]string{"$test-mod"}, func(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
-		hasAccess, err := memberInRoles(s, m.GuildID, m.Author.ID, moderatorRoles)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		if !hasAccess {
-			// No permission
-			return
-		}
-
-		s.ChannelMessageSend(m.ChannelID, "you are >= mod")
-	})
-
-	commands.Register([]string{"$test-admin"}, func(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
-		hasAccess, err := memberInRoles(s, m.GuildID, m.Author.ID, adminRoles)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		if !hasAccess {
-			// No permission
-			return
-		}
-
-		s.ChannelMessageSend(m.ChannelID, "you are >= admin")
-	})
-
-	commands.Register([]string{"$channels"}, func(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
-		hasAccess, err := memberInRoles(s, m.GuildID, m.Author.ID, miniModeratorRoles)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		if !hasAccess {
-			// No permission
-			return
-		}
-
-		channels, err := s.GuildChannels(m.GuildID)
-		if err != nil {
-			fmt.Println("Error getting channels:", err)
-			return
-		}
-
-		outputs := []string{}
-		for _, channel := range channels {
-			outputs = append(outputs, fmt.Sprintf("[%s] %s = %s\n", getChannelTypeName(channel.Type), channel.ID, channel.Name))
-		}
-
-		utils.SendChunks("```", "```", outputs, m.ChannelID, s)
-	})
-
-	commands.Register([]string{"$roles"}, func(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
-		if m.Author.ID != "85699361769553920" {
-			return
-		}
-
-		roles, err := s.GuildRoles(m.GuildID)
-		if err != nil {
-			fmt.Println("Error getting roles:", err)
-			return
-		}
-
-		response := "```"
-		for _, role := range roles {
-			if role.Managed {
-				continue
-			}
-			response += fmt.Sprintf("%s = %s\n", role.ID, role.Name)
-		}
-		response += "```"
-
-		s.ChannelMessageSend(m.ChannelID, response)
-	})
-
-	commands.Register([]string{"$userid"}, func(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
-		hasAccess, err := memberInRoles(s, m.GuildID, m.Author.ID, miniModeratorRoles)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		if !hasAccess {
-			// No permission
-			return
-		}
-
-		if len(parts) < 2 {
-			return
-		}
-
-		target := parts[1]
-		targetID := cleanUserID(parts[1])
-
-		s.ChannelMessageSend(m.ChannelID, "User ID of "+target+" is `"+targetID+"`")
-	})
+	commands.SQLClient = sqlClient
 }
 
 func main() {
-	bot, err := discordgo.New("Bot " + token)
+	bot, err := discordgo.New("Bot " + config.Token)
 	if err != nil {
 		fmt.Println("error creating Discord session,", err)
 		return
@@ -270,7 +88,7 @@ func main() {
 					continue
 				}
 
-				var action Action
+				var action pkg.Action
 				err = json.Unmarshal([]byte(actionString), &action)
 				if err != nil {
 					fmt.Println("Error unmarshaling action:", err)
@@ -296,8 +114,6 @@ func main() {
 		}
 	}()
 
-	registerCommands()
-
 	bot.AddHandler(onMessage)
 	bot.AddHandler(onMessageDeleted)
 	bot.AddHandler(onUserBanned)
@@ -317,45 +133,6 @@ func main() {
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 	<-sc
-}
-
-// returns true if the given user id is in one of the given roles
-func memberInRoles(s *discordgo.Session, guildID string, userID string, roles []string) (bool, error) {
-	member, err := s.State.Member(guildID, userID)
-	if err != nil {
-		if member, err = s.GuildMember(guildID, userID); err != nil {
-			return false, err
-		}
-	}
-
-	// Iterate through the role IDs stored in member.Roles
-	// to check permissions
-	for _, roleID := range member.Roles {
-		role, err := s.State.Role(guildID, roleID)
-		if err != nil {
-			return false, err
-		}
-		for _, tRole := range roles {
-			if role.ID == tRole {
-				return true, nil
-			}
-		}
-	}
-
-	return false, nil
-}
-
-var patternUserIDReplacer = regexp.MustCompile(`^<@!?([0-9]+)>$`)
-var patternUserID = regexp.MustCompile(`^[0-9]+$`)
-
-func cleanUserID(input string) string {
-	output := patternUserIDReplacer.ReplaceAllString(input, "$1")
-
-	if !patternUserID.MatchString(output) {
-		return ""
-	}
-
-	return output
 }
 
 func pushMessageIntoDatabase(m *discordgo.MessageCreate) (err error) {
@@ -384,18 +161,18 @@ func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	c, parts := commands.Match(m.Content)
 	if c != nil {
-		if cmd, ok := c.(Command); ok {
+		if cmd, ok := c.(pkg.Command); ok {
 			id := m.ChannelID + m.Author.ID
 			if cmd.HasUserIDCooldown(id) {
 				return
 			}
 
 			switch cmd.Run(s, m, parts) {
-			case CommandResultUserCooldown:
+			case pkg.CommandResultUserCooldown:
 				cmd.AddUserIDCooldown(id)
-			case CommandResultGlobalCooldown:
+			case pkg.CommandResultGlobalCooldown:
 				cmd.AddGlobalCooldown()
-			case CommandResultFullCooldown:
+			case pkg.CommandResultFullCooldown:
 				cmd.AddUserIDCooldown(id)
 				cmd.AddGlobalCooldown()
 			}
@@ -416,7 +193,7 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 	if m.Author != nil {
 		output += "\nAuthor: <@" + m.Author.ID + "> (" + m.Author.Username + " (" + m.Author.ID + "))"
 	}
-	s.ChannelMessageSend(actionLogChannelID, output)
+	s.ChannelMessageSend(config.ActionLogChannelID, output)
 }
 
 func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
@@ -449,7 +226,7 @@ func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
 	fmt.Println(entry)
 	fmt.Println("Entry User ID:", entry.UserID)
 	fmt.Println("target user ID:", m.User.ID)
-	s.ChannelMessageSend(moderationActionChannelID, fmt.Sprintf("%s was banned by %s: %s", m.User.Mention(), banner.Username, entry.Reason))
+	s.ChannelMessageSend(config.ModerationActionChannelID, fmt.Sprintf("%s was banned by %s: %s", m.User.Mention(), banner.Username, entry.Reason))
 }
 
 // const weebMessageID = `552788256333234176`
@@ -459,7 +236,7 @@ const reactionBye = "👋"
 func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 	if m.MessageID == weebMessageID {
 		if m.Emoji.Name == reactionBye {
-			c, err := s.State.Channel(weebChannelID)
+			c, err := s.State.Channel(config.WeebChannelID)
 			if err != nil {
 				fmt.Println("err:", err)
 				return
@@ -475,7 +252,7 @@ func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAd
 				return
 			}
 
-			err = s.ChannelPermissionSet(weebChannelID, m.UserID, "member", 0, discordgo.PermissionReadMessages)
+			err = s.ChannelPermissionSet(config.WeebChannelID, m.UserID, "member", 0, discordgo.PermissionReadMessages)
 			if err != nil {
 				fmt.Println("uh oh something went wrong")
 				return
@@ -489,7 +266,7 @@ func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAd
 func onMessageReactionRemoved(s *discordgo.Session, m *discordgo.MessageReactionRemove) {
 	if m.MessageID == weebMessageID {
 		if m.Emoji.Name == reactionBye {
-			c, err := s.State.Channel(weebChannelID)
+			c, err := s.State.Channel(config.WeebChannelID)
 			if err != nil {
 				fmt.Println("err:", err)
 				return
@@ -506,29 +283,12 @@ func onMessageReactionRemoved(s *discordgo.Session, m *discordgo.MessageReaction
 				return
 			}
 
-			err = s.ChannelPermissionDelete(weebChannelID, m.UserID)
+			err = s.ChannelPermissionDelete(config.WeebChannelID, m.UserID)
 			if err != nil {
 				fmt.Println("uh oh something went wrong")
 				return
 			}
 			// s.ChannelMessageSend(m.ChannelID, "removed permission")
 		}
-	}
-}
-
-func getChannelTypeName(channelType discordgo.ChannelType) string {
-	switch channelType {
-	case discordgo.ChannelTypeGuildCategory:
-		return "Category"
-	case discordgo.ChannelTypeGuildText:
-		return "Text"
-	case discordgo.ChannelTypeGuildVoice:
-		return "Voice"
-	case discordgo.ChannelTypeDM:
-		return "DM"
-	case discordgo.ChannelTypeGroupDM:
-		return "Group DM"
-	default:
-		return "unknown"
 	}
 }

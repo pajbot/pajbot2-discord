@@ -1,33 +1,39 @@
-package main
+package roleinfo
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/pajlada/pajbot2-discord/pkg"
+	"github.com/pajlada/pajbot2-discord/pkg/commands"
 	c2 "github.com/pajlada/pajbot2/pkg/commands"
 )
 
-var _ Command = &cmdRoleInfo{}
+func init() {
+	commands.Register([]string{"$roleinfo"}, New())
+}
 
-type cmdRoleInfo struct {
+var _ pkg.Command = &Command{}
+
+type Command struct {
 	c2.Base
 }
 
-func newRoleInfo() *cmdRoleInfo {
-	return &cmdRoleInfo{
+func New() *Command {
+	return &Command{
 		Base: c2.NewBase(),
 	}
 }
 
-func (c *cmdRoleInfo) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) CommandResult {
+func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) pkg.CommandResult {
 	const usage = `$roleinfo ROLENAME (e.g. $roleinfo roleplayer)`
 
 	parts = parts[1:]
 
 	if len(parts) < 1 {
 		s.ChannelMessageSend(m.ChannelID, m.Author.Mention()+" usage: "+usage)
-		return CommandResultUserCooldown
+		return pkg.CommandResultUserCooldown
 	}
 
 	roleName := strings.Join(parts[0:], " ")
@@ -35,7 +41,7 @@ func (c *cmdRoleInfo) Run(s *discordgo.Session, m *discordgo.MessageCreate, part
 	roles, err := s.GuildRoles(m.GuildID)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, m.Author.Mention()+" error getting roles: "+err.Error())
-		return CommandResultUserCooldown
+		return pkg.CommandResultUserCooldown
 	}
 
 	for _, role := range roles {
@@ -46,14 +52,14 @@ func (c *cmdRoleInfo) Run(s *discordgo.Session, m *discordgo.MessageCreate, part
 		if strings.EqualFold(role.Name, roleName) {
 			roleInfoString := fmt.Sprintf("id=%s, color=#%06x", role.ID, role.Color)
 			s.ChannelMessageSend(m.ChannelID, m.Author.Mention()+" role info: "+roleInfoString)
-			return CommandResultFullCooldown
+			return pkg.CommandResultFullCooldown
 		}
 	}
 
 	s.ChannelMessageSend(m.ChannelID, m.Author.Mention()+" no role found with that name")
-	return CommandResultUserCooldown
+	return pkg.CommandResultUserCooldown
 }
 
-func (c *cmdRoleInfo) Description() string {
+func (c *Command) Description() string {
 	return c.Base.Description
 }

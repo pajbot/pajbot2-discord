@@ -1,36 +1,44 @@
-package main
+package ban
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/pajlada/pajbot2-discord/internal/config"
+	"github.com/pajlada/pajbot2-discord/pkg"
+	"github.com/pajlada/pajbot2-discord/pkg/commands"
 	c2 "github.com/pajlada/pajbot2/pkg/commands"
 )
 
-var _ Command = &cmdBan{}
+func init() {
+	commands.Register([]string{"$ban"}, New())
+}
 
-type cmdBan struct {
+type Command struct {
 	c2.Base
 }
 
-func newBan() *cmdBan {
-	return &cmdBan{
+func New() *Command {
+	return &Command{
 		Base: c2.NewBase(),
 	}
 }
 
-func (c *cmdBan) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) (res CommandResult) {
-	res = CommandResultNoCooldown
-	hasAccess, err := memberInRoles(s, m.GuildID, m.Author.ID, moderatorRoles)
+func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) (res pkg.CommandResult) {
+	res = pkg.CommandResultNoCooldown
+	// FIXME
+	// hasAccess, err := memberInRoles(s, m.GuildID, m.Author.ID, moderatorRoles)
+	hasAccess := false
+	var err error
 	if err != nil {
 		fmt.Println("Error:", err)
-		return CommandResultUserCooldown
+		return pkg.CommandResultUserCooldown
 	}
 
 	if !hasAccess {
 		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%s, you don't have permission dummy", m.Author.Mention()))
-		return CommandResultUserCooldown
+		return pkg.CommandResultUserCooldown
 	}
 
 	if len(m.Mentions) == 0 {
@@ -48,12 +56,12 @@ func (c *cmdBan) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []s
 	reason := strings.Join(parts[2:], " ")
 
 	s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Banning %s (%s) for reason: `%s`", target.Username, target.ID, reason))
-	s.ChannelMessageSend(moderationActionChannelID, fmt.Sprintf("%s banned %s (%s) for reason: `%s`", m.Author.Username, target.Username, target.ID, reason))
+	s.ChannelMessageSend(config.ModerationActionChannelID, fmt.Sprintf("%s banned %s (%s) for reason: `%s`", m.Author.Username, target.Username, target.ID, reason))
 	s.GuildBanCreateWithReason(m.GuildID, target.ID, reason, 0)
 
 	return
 }
 
-func (c *cmdBan) Description() string {
+func (c *Command) Description() string {
 	return c.Base.Description
 }

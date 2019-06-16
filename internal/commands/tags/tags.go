@@ -1,26 +1,32 @@
-package main
+package tags
 
 import (
 	"fmt"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/pajlada/pajbot2-discord/pkg"
+	"github.com/pajlada/pajbot2-discord/pkg/commands"
 	c2 "github.com/pajlada/pajbot2/pkg/commands"
 )
 
-var _ Command = &cmdTags{}
+var _ pkg.Command = &Command{}
 
-type cmdTags struct {
+func init() {
+	commands.Register([]string{"$tags"}, New())
+}
+
+type Command struct {
 	c2.Base
 }
 
-func newTags() *cmdTags {
-	return &cmdTags{
+func New() *Command {
+	return &Command{
 		Base: c2.NewBase(),
 	}
 }
 
-func (c *cmdTags) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) (res CommandResult) {
-	res = CommandResultUserCooldown
+func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) (res pkg.CommandResult) {
+	res = pkg.CommandResultUserCooldown
 
 	if m.Author != nil {
 		const responseFormat = "%s, your user tags are: ID=`%s`, Name=`%s`, Discriminator=`%s`, Verified=`%t`, Bot=`%t`"
@@ -31,6 +37,6 @@ func (c *cmdTags) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	return
 }
 
-func (c *cmdTags) Description() string {
+func (c *Command) Description() string {
 	return c.Base.Description
 }

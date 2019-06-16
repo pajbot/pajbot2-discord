@@ -1,4 +1,4 @@
-package main
+package mute
 
 import (
 	"encoding/json"
@@ -7,24 +7,32 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/pajbot/utils"
+	"github.com/pajlada/pajbot2-discord/internal/config"
+	"github.com/pajlada/pajbot2-discord/pkg"
+	"github.com/pajlada/pajbot2-discord/pkg/commands"
+	"github.com/pajlada/pajbot2-discord/pkg/utils"
 	c2 "github.com/pajlada/pajbot2/pkg/commands"
+	pb2utils "github.com/pajlada/pajbot2/pkg/utils"
 )
 
-var _ Command = &cmdMute{}
+func init() {
+	commands.Register([]string{"$mute"}, New())
+}
 
-type cmdMute struct {
+var _ pkg.Command = &Command{}
+
+type Command struct {
 	c2.Base
 }
 
-func newMute() *cmdMute {
-	return &cmdMute{
+func New() *Command {
+	return &Command{
 		Base: c2.NewBase(),
 	}
 }
 
-func (c *cmdMute) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) (res CommandResult) {
-	res = CommandResultNoCooldown
+func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) (res pkg.CommandResult) {
+	res = pkg.CommandResultNoCooldown
 	const usage = `$mute @user duration <reason> (i.e. $mute @user 1h5m shitposting in serious channel)`
 
 	var err error
@@ -32,14 +40,15 @@ func (c *cmdMute) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	var duration time.Duration
 	var reason string
 
-	hasAccess, err := memberInRoles(s, m.GuildID, m.Author.ID, miniModeratorRoles)
+	// FIXME
+	hasAccess, err := utils.MemberInRoles(s, m.GuildID, m.Author.ID, config.MiniModeratorRoles)
 	if err != nil {
 		fmt.Println("Error:", err)
-		return CommandResultUserCooldown
+		return pkg.CommandResultUserCooldown
 	}
 	if !hasAccess {
 		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%s, you don't have permission to use $mute", m.Author.Mention()))
-		return CommandResultUserCooldown
+		return pkg.CommandResultUserCooldown
 	}
 
 	parts = parts[1:]
@@ -49,14 +58,14 @@ func (c *cmdMute) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		return
 	}
 
-	targetID = cleanUserID(parts[0])
+	targetID = utils.CleanUserID(parts[0])
 
 	if targetID == "" {
 		s.ChannelMessageSend(m.ChannelID, m.Author.Mention()+" $mute invalid user. usage: "+usage)
 		return
 	}
 
-	duration, err = utils.ParseDuration(parts[1])
+	duration, err = pb2utils.ParseDuration(parts[1])
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, m.Author.Mention()+" $mute invalid duration: "+err.Error())
 		return
@@ -73,11 +82,11 @@ func (c *cmdMute) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	// Create queued up unmute action in database
 	timepoint := time.Now().Add(duration)
 
-	action := Action{
+	action := pkg.Action{
 		Type:    "unmute",
 		GuildID: m.GuildID,
 		UserID:  targetID,
-		RoleID:  mutedRole,
+		RoleID:  config.MutedRole,
 	}
 	bytes, err := json.Marshal(&action)
 	if err != nil {
@@ -86,21 +95,21 @@ func (c *cmdMute) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	}
 
 	query := "INSERT INTO discord_queue (action, timepoint) VALUES ($1, $2)"
-	_, err = sqlClient.Exec(query, string(bytes), timepoint)
+	_, err = commands.SQLClient.Exec(query, string(bytes), timepoint)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, m.Author.Mention()+" $mute sql error: "+err.Error())
 		return
 	}
 
 	// Assign muted role
-	err = s.GuildMemberRoleAdd(m.GuildID, targetID, mutedRole)
+	err = s.GuildMemberRoleAdd(m.GuildID, targetID, config.MutedRole)
 	if err != nil {
 		fmt.Println("Error assigning role:", err)
 	}
 
 	// Announce mute in action channel
-	s.ChannelMessageSend(moderationActionChannelID, fmt.Sprintf("%s muted %s for %s. reason: %s", m.Author.Mention(), targetID, duration, reason))
-	fmt.Println(moderationActionChannelID, fmt.Sprintf("%s muted %s for %s. reason: %s", m.Author.Mention(), targetID, duration, reason))
+	s.ChannelMessageSend(config.ModerationActionChannelID, fmt.Sprintf("%s muted %s for %s. reason: %s", m.Author.Mention(), targetID, duration, reason))
+	fmt.Println(config.ModerationActionChannelID, fmt.Sprintf("%s muted %s for %s. reason: %s", m.Author.Mention(), targetID, duration, reason))
 
 	// Announce mute success
 	s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%s mute %s for %s. reason: %s", m.Author.Mention(), targetID, duration, reason))
@@ -109,6 +118,6 @@ func (c *cmdMute) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	return
 }
 
-func (c *cmdMute) Description() string {
+func (c *Command) Description() string {
 	return c.Base.Description
 }
