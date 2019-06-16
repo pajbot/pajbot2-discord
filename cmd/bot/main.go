@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -188,8 +189,11 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 	if err != nil {
 		fmt.Println("Error getting full message")
 	}
+
+	// TODO: Don't list messages deleted from or by ourselves (this bot account)
+
 	output += "Message deleted in <#" + m.ChannelID + ">"
-	output += "\nContent: `" + messageContent + "`"
+	output += "\nContent: `" + strings.Replace(messageContent, "`", "", -1) + "`"
 	if m.Author != nil {
 		output += "\nAuthor: <@" + m.Author.ID + "> (" + m.Author.Username + " (" + m.Author.ID + "))"
 	}
