@@ -11,24 +11,24 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/pajlada/pajbot2-discord/internal/config"
-	"github.com/pajlada/pajbot2-discord/pkg"
-	"github.com/pajlada/pajbot2-discord/pkg/commands"
+	"github.com/pajbot/pajbot2-discord/internal/config"
+	"github.com/pajbot/pajbot2-discord/pkg"
+	"github.com/pajbot/pajbot2-discord/pkg/commands"
 	"github.com/pajlada/stupidmigration"
 
 	_ "github.com/lib/pq"
 
-	_ "github.com/pajlada/pajbot2-discord/internal/commands/ban"
-	_ "github.com/pajlada/pajbot2-discord/internal/commands/channelinfo"
-	_ "github.com/pajlada/pajbot2-discord/internal/commands/channels"
-	_ "github.com/pajlada/pajbot2-discord/internal/commands/guildinfo"
-	_ "github.com/pajlada/pajbot2-discord/internal/commands/modcommands"
-	_ "github.com/pajlada/pajbot2-discord/internal/commands/mute"
-	_ "github.com/pajlada/pajbot2-discord/internal/commands/ping"
-	_ "github.com/pajlada/pajbot2-discord/internal/commands/roleinfo"
-	_ "github.com/pajlada/pajbot2-discord/internal/commands/roles"
-	_ "github.com/pajlada/pajbot2-discord/internal/commands/tags"
-	_ "github.com/pajlada/pajbot2-discord/internal/commands/userid"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/ban"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/channelinfo"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/channels"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/guildinfo"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/modcommands"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/mute"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/ping"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/roleinfo"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/roles"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/tags"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/userid"
 )
 
 var sqlClient *sql.DB

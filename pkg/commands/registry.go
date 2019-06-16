@@ -2,7 +2,7 @@ package commands
 
 import (
 	"github.com/pajbot/commandmatcher"
-	"github.com/pajlada/pajbot2-discord/pkg"
+	"github.com/pajbot/pajbot2-discord/pkg"
 )
 
 var (

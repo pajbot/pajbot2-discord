@@ -1,4 +1,4 @@
-module github.com/pajlada/pajbot2-discord
+module github.com/pajbot/pajbot2-discord
 
 go 1.12
 

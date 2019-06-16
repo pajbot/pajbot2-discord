@@ -6,8 +6,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/basecommand"
-	"github.com/pajlada/pajbot2-discord/pkg"
-	"github.com/pajlada/pajbot2-discord/pkg/commands"
+	"github.com/pajbot/pajbot2-discord/pkg"
+	"github.com/pajbot/pajbot2-discord/pkg/commands"
 )
 
 func init() {
