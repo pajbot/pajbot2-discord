@@ -4,24 +4,22 @@ import (
 	"fmt"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/pajbot/basecommand"
 	"github.com/pajlada/pajbot2-discord/pkg"
 	"github.com/pajlada/pajbot2-discord/pkg/commands"
-	c2 "github.com/pajlada/pajbot2/pkg/commands"
 )
-
-var _ pkg.Command = &Command{}
 
 func init() {
 	commands.Register([]string{"$tags"}, New())
 }
 
 type Command struct {
-	c2.Base
+	basecommand.Command
 }
 
 func New() *Command {
 	return &Command{
-		Base: c2.NewBase(),
+		Command: basecommand.New(),
 	}
 }
 
@@ -38,5 +36,5 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 }
 
 func (c *Command) Description() string {
-	return c.Base.Description
+	return c.Command.Description
 }
