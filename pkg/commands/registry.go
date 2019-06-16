@@ -1,12 +1,12 @@
 package commands
 
 import (
-	"github.com/pajbot/pajbot2/pkg/commandmatcher"
+	"github.com/pajbot/commandmatcher"
 	"github.com/pajlada/pajbot2-discord/pkg"
 )
 
 var (
-	c = commandmatcher.NewMatcher()
+	c = commandmatcher.New()
 )
 
 func Register(aliases []string, command pkg.Command) {
