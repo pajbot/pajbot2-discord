@@ -137,15 +137,19 @@ func main() {
 }
 
 func pushMessageIntoDatabase(m *discordgo.MessageCreate) (err error) {
-	const query = `INSERT INTO discord_messages (id, content) VALUES ($1, $2)`
-	_, err = sqlClient.Exec(query, m.ID, m.Content)
+	const query = `INSERT INTO discord_messages (id, content, author_id) VALUES ($1, $2, $3)`
+	authorID := "unknown"
+	if m.Author != nil {
+		authorID = m.Author.ID
+	}
+	_, err = sqlClient.Exec(query, m.ID, m.Content, authorID)
 	return
 }
 
-func getMessageFromDatabase(messageID string) (content string, err error) {
-	const query = `SELECT content FROM discord_messages WHERE id=$1`
+func getMessageFromDatabase(messageID string) (content string, authorID string, err error) {
+	const query = `SELECT content, author_id FROM discord_messages WHERE id=$1`
 	row := sqlClient.QueryRow(query, messageID)
-	err = row.Scan(&content)
+	err = row.Scan(&content, &authorID)
 	return
 }
 
@@ -183,21 +187,55 @@ func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
+// TODO: Don't list messages deleted from or by ourselves (this bot account)
 func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
-	var output string
-	messageContent, err := getMessageFromDatabase(m.ID)
+	var authorID string
+	messageContent, authorID, err := getMessageFromDatabase(m.ID)
 	if err != nil {
 		fmt.Println("Error getting full message")
 	}
 
-	// TODO: Don't list messages deleted from or by ourselves (this bot account)
-
-	output += "Message deleted in <#" + m.ChannelID + ">"
-	output += "\nContent: `" + strings.Replace(messageContent, "`", "", -1) + "`"
-	if m.Author != nil {
-		output += "\nAuthor: <@" + m.Author.ID + "> (" + m.Author.Username + " (" + m.Author.ID + "))"
+	// Try to get member
+	var member *discordgo.Member
+	if authorID != "unknown" {
+		member, err = s.GuildMember(m.GuildID, authorID)
+		if err != nil {
+			fmt.Println("Error getting guild member:", err)
+		}
 	}
-	s.ChannelMessageSend(config.ActionLogChannelID, output)
+
+	embed := &discordgo.MessageEmbed{
+		Title: "Message deleted",
+	}
+
+	if member != nil {
+		payload := fmt.Sprintf("<@%s> - Name: %s#%s - ID: %s", authorID, member.User.Username, member.User.Discriminator, authorID)
+		if member.Nick != "" {
+			payload += " Nickname: " + member.Nick
+		}
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "Author",
+			Value:  payload,
+			Inline: true,
+		})
+	} else {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "Author",
+			Value:  "unknown",
+			Inline: true,
+		})
+	}
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "Content",
+		Value:  strings.Replace(messageContent, "`", "", -1),
+		Inline: true,
+	})
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "Channel",
+		Value:  "<#" + m.ChannelID + ">",
+		Inline: true,
+	})
+	s.ChannelMessageSendEmbed(config.ActionLogChannelID, embed)
 }
 
 func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
