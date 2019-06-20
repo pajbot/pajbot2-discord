@@ -40,7 +40,6 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	var duration time.Duration
 	var reason string
 
-	// FIXME
 	hasAccess, err := utils.MemberInRoles(s, m.GuildID, m.Author.ID, config.MiniModeratorRoles)
 	if err != nil {
 		fmt.Println("Error:", err)
