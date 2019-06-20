@@ -13,6 +13,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/pajbot2-discord/internal/config"
+	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
 	"github.com/pajlada/stupidmigration"
@@ -22,6 +23,7 @@ import (
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/ban"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/channelinfo"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/channels"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/configure"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/guildinfo"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/modcommands"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/mute"
@@ -55,6 +57,25 @@ func init() {
 	}
 
 	commands.SQLClient = sqlClient
+
+	// Load channel roles from config
+	const query = "SELECT server_id, key, value FROM config"
+	rows, err := sqlClient.Query(query)
+	if err != nil {
+		fmt.Println("Error loading channel roles:", err)
+		os.Exit(1)
+	}
+
+	for rows.Next() {
+		var serverID, key, value string
+		err := rows.Scan(&serverID, &key, &value)
+		if err != nil {
+			fmt.Println("Error scanning channel roles:", err)
+			os.Exit(1)
+		}
+
+		serverconfig.Set(serverID, key, value)
+	}
 }
 
 func main() {
@@ -195,6 +216,12 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 		fmt.Println("Error getting full message")
 	}
 
+	targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
+	if targetChannel == "" {
+		fmt.Println("No channel set up for action log")
+		return
+	}
+
 	// Try to get member
 	var member *discordgo.Member
 	if authorID != "unknown" {
@@ -235,7 +262,7 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 		Value:  "<#" + m.ChannelID + ">",
 		Inline: true,
 	})
-	s.ChannelMessageSendEmbed(config.ActionLogChannelID, embed)
+	s.ChannelMessageSendEmbed(targetChannel, embed)
 }
 
 func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
@@ -268,7 +295,14 @@ func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
 	fmt.Println(entry)
 	fmt.Println("Entry User ID:", entry.UserID)
 	fmt.Println("target user ID:", m.User.ID)
-	s.ChannelMessageSend(config.ModerationActionChannelID, fmt.Sprintf("%s was banned by %s: %s", m.User.Mention(), banner.Username, entry.Reason))
+
+	targetChannel := serverconfig.Get(m.GuildID, "channel:moderation-action")
+	if targetChannel == "" {
+		fmt.Println("No channel set up for moderation actions")
+		return
+	}
+
+	s.ChannelMessageSend(targetChannel, fmt.Sprintf("%s was banned by %s: %s", m.User.Mention(), banner.Username, entry.Reason))
 }
 
 // const weebMessageID = `552788256333234176`
@@ -276,9 +310,15 @@ const weebMessageID = `552791672854151190`
 const reactionBye = "👋"
 
 func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
+	targetChannel := serverconfig.Get(m.GuildID, "channel:weeb-channel")
+	if targetChannel == "" {
+		fmt.Println("No channel set up for weeb channel (good)")
+		return
+	}
+
 	if m.MessageID == weebMessageID {
 		if m.Emoji.Name == reactionBye {
-			c, err := s.State.Channel(config.WeebChannelID)
+			c, err := s.State.Channel(targetChannel)
 			if err != nil {
 				fmt.Println("err:", err)
 				return
@@ -294,7 +334,7 @@ func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAd
 				return
 			}
 
-			err = s.ChannelPermissionSet(config.WeebChannelID, m.UserID, "member", 0, discordgo.PermissionReadMessages)
+			err = s.ChannelPermissionSet(targetChannel, m.UserID, "member", 0, discordgo.PermissionReadMessages)
 			if err != nil {
 				fmt.Println("uh oh something went wrong")
 				return
@@ -306,9 +346,15 @@ func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAd
 }
 
 func onMessageReactionRemoved(s *discordgo.Session, m *discordgo.MessageReactionRemove) {
+	targetChannel := serverconfig.Get(m.GuildID, "channel:weeb-channel")
+	if targetChannel == "" {
+		fmt.Println("No channel set up for weeb channel (good)")
+		return
+	}
+
 	if m.MessageID == weebMessageID {
 		if m.Emoji.Name == reactionBye {
-			c, err := s.State.Channel(config.WeebChannelID)
+			c, err := s.State.Channel(targetChannel)
 			if err != nil {
 				fmt.Println("err:", err)
 				return
@@ -325,7 +371,7 @@ func onMessageReactionRemoved(s *discordgo.Session, m *discordgo.MessageReaction
 				return
 			}
 
-			err = s.ChannelPermissionDelete(config.WeebChannelID, m.UserID)
+			err = s.ChannelPermissionDelete(targetChannel, m.UserID)
 			if err != nil {
 				fmt.Println("uh oh something went wrong")
 				return

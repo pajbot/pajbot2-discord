@@ -8,11 +8,12 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/basecommand"
-	pb2utils "github.com/pajbot/utils"
 	"github.com/pajbot/pajbot2-discord/internal/config"
+	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
 	"github.com/pajbot/pajbot2-discord/pkg/utils"
+	pb2utils "github.com/pajbot/utils"
 )
 
 func init() {
@@ -106,9 +107,15 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		fmt.Println("Error assigning role:", err)
 	}
 
+	targetChannel := serverconfig.Get(m.GuildID, "channel:moderation-action")
+	if targetChannel == "" {
+		fmt.Println("No channel set up for moderation actions")
+		return
+	}
+
 	// Announce mute in action channel
-	s.ChannelMessageSend(config.ModerationActionChannelID, fmt.Sprintf("%s muted %s for %s. reason: %s", m.Author.Mention(), targetID, duration, reason))
-	fmt.Println(config.ModerationActionChannelID, fmt.Sprintf("%s muted %s for %s. reason: %s", m.Author.Mention(), targetID, duration, reason))
+	s.ChannelMessageSend(targetChannel, fmt.Sprintf("%s muted %s for %s. reason: %s", m.Author.Mention(), targetID, duration, reason))
+	fmt.Println(targetChannel, fmt.Sprintf("%s muted %s for %s. reason: %s", m.Author.Mention(), targetID, duration, reason))
 
 	// Announce mute success
 	s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%s mute %s for %s. reason: %s", m.Author.Mention(), targetID, duration, reason))
