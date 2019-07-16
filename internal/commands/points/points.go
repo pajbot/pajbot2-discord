@@ -3,6 +3,7 @@ package points
 import (
 	"fmt"
 	"net/http"
+	"encoding/json"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/basecommand"
