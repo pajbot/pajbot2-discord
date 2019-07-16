@@ -4,9 +4,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 	"time"
@@ -141,6 +144,7 @@ func main() {
 	bot.AddHandler(onUserBanned)
 	bot.AddHandler(onMessageReactionAdded)
 	bot.AddHandler(onMessageReactionRemoved)
+	bot.AddHandler(onPresenceUpdate)
 
 	// Open a websocket connection to Discord and begin listening.
 	err = bot.Open()
@@ -377,6 +381,56 @@ func onMessageReactionRemoved(s *discordgo.Session, m *discordgo.MessageReaction
 				return
 			}
 			// s.ChannelMessageSend(m.ChannelID, "removed permission")
+		}
+	}
+}
+
+func onPresenceUpdate(s *discordgo.Session, m *discordgo.PresenceUpdate) {
+	return
+
+	fmt.Println("Presence update:", *m)
+	fmt.Println("Presence update:", m.Roles)
+	if m.User != nil {
+		fmt.Println("User", *m.User)
+	}
+	fmt.Println("Status", m.Status)
+	if m.Game != nil {
+		fmt.Println("Game", m.Game)
+	}
+	fmt.Println("Nick", m.Nick)
+
+	user, err := s.User(m.User.ID)
+	if err != nil {
+		fmt.Println("Error getting user:", err)
+		return
+	}
+
+	avatarURL := user.AvatarURL("")
+	fmt.Println("Avatar URL:", avatarURL)
+
+	filename := path.Base(avatarURL)
+
+	if _, err := os.Stat(filename); err == nil {
+		// already exists
+		return
+	} else if os.IsNotExist(err) {
+		resp, err := http.Get(avatarURL)
+		if err != nil {
+			fmt.Println("Error getting avatar at url", avatarURL)
+			return
+		}
+		defer resp.Body.Close()
+
+		f, err := os.Create(filename)
+		if err != nil {
+			fmt.Println("Error opening avatar file locally", filename)
+			return
+		}
+		defer f.Close()
+		_, err = io.Copy(f, resp.Body)
+		if err != nil {
+			fmt.Println("Error copying data from request to file")
+			return
 		}
 	}
 }
