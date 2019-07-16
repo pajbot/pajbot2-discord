@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	commands.Register([]string{"userid"}, New())
+	commands.Register([]string{"$userid"}, New())
 }
 
 var _ pkg.Command = &Command{}
