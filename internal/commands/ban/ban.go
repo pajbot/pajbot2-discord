@@ -60,8 +60,11 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		return
 	}
 
-	s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Banning %s (%s) for reason: `%s`", target.Username, target.ID, reason))
-	s.ChannelMessageSend(targetChannel, fmt.Sprintf("%s banned %s (%s) for reason: `%s`", m.Author.Username, target.Username, target.ID, reason))
+	const resultFormat = "Banning %s (%s) for reason: `%s`"
+	resultMessage := fmt.Sprintf(resultFormat, target.Username, target.ID, reason)
+
+	s.ChannelMessageSend(m.ChannelID, resultMessage)
+	s.ChannelMessageSend(targetChannel, resultMessage)
 	s.GuildBanCreateWithReason(m.GuildID, target.ID, reason, 0)
 
 	return
