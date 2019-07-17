@@ -37,7 +37,6 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	const usage = `$mute @user duration <reason> (i.e. $mute @user 1h5m shitposting in serious channel)`
 
 	var err error
-	var targetID string
 	var duration time.Duration
 	var reason string
 
@@ -58,12 +57,12 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		return
 	}
 
-	targetID = utils.CleanUserID(parts[0])
-
-	if targetID == "" {
-		s.ChannelMessageSend(m.ChannelID, m.Author.Mention()+" $mute invalid user. usage: "+usage)
+	if len(m.Mentions) == 0 {
+		s.ChannelMessageSend(m.ChannelID, "missing user arg. usage: $mute <user> <time> <reason>")
 		return
 	}
+
+	target := m.Mentions[0]
 
 	duration, err = pb2utils.ParseDuration(parts[1])
 	if err != nil {
@@ -85,7 +84,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	action := pkg.Action{
 		Type:    "unmute",
 		GuildID: m.GuildID,
-		UserID:  targetID,
+		UserID:  target.ID,
 		RoleID:  config.MutedRole,
 	}
 	bytes, err := json.Marshal(&action)
@@ -102,10 +101,16 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	}
 
 	// Assign muted role
-	err = s.GuildMemberRoleAdd(m.GuildID, targetID, config.MutedRole)
+	err = s.GuildMemberRoleAdd(m.GuildID, target.ID, config.MutedRole)
 	if err != nil {
 		fmt.Println("Error assigning role:", err)
 	}
+
+	const resultFormat = "%s muted %s (%s - %s) for %s. reason: %s"
+	resultMessage := fmt.Sprintf(resultFormat, m.Author.Mention(), target.Username, target.ID, target.Mention(), duration, reason)
+
+	// Announce mute success in channel
+	s.ChannelMessageSend(m.ChannelID, resultMessage)
 
 	targetChannel := serverconfig.Get(m.GuildID, "channel:moderation-action")
 	if targetChannel == "" {
@@ -113,13 +118,8 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		return
 	}
 
-	// Announce mute in action channel
-	s.ChannelMessageSend(targetChannel, fmt.Sprintf("%s muted %s for %s. reason: %s", m.Author.Mention(), targetID, duration, reason))
-	fmt.Println(targetChannel, fmt.Sprintf("%s muted %s for %s. reason: %s", m.Author.Mention(), targetID, duration, reason))
-
-	// Announce mute success
-	s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%s mute %s for %s. reason: %s", m.Author.Mention(), targetID, duration, reason))
-	fmt.Println(m.ChannelID, fmt.Sprintf("%s mute %s for %s. reason: %s", m.Author.Mention(), targetID, duration, reason))
+	// Announce mute in moderation-action channel
+	s.ChannelMessageSend(targetChannel, resultMessage)
 
 	return
 }
