@@ -3,6 +3,7 @@ package points
 import (
 	"fmt"
 	"net/http"
+	"encoding/json"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/basecommand"
@@ -22,10 +23,10 @@ type Command struct {
 	basecommand.Command
 }
 
-type Points struct {
-	Id   int64  `json:"id"`
+type User struct {
+	ID   int64  `json:"id"`
 	Name string `json:"username"`
-	NameRaw string `json:"username_raw"`
+	DisplayName string `json:"username_raw"`
 	Points string `json:"points"`
 	NlRank string `json:"nl_rank"`
 	PointsRank string `json:"points_rank"`
@@ -47,7 +48,7 @@ func New() *Command {
 }
 
 func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) (res pkg.CommandResult) {
-	res = pkg.CommandResultNoCooldown
+	res = pkg.CommandResultUserCooldown
 	
 	if len(parts) < 1 {
 		s.ChannelMessageSend(m.ChannelID, "You need to provide a twitch username. usage: $points <username>")
@@ -63,15 +64,15 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		return
 	}
 	
-	var p Points
+	var user User
 	
-	err := json.NewDecoder(resp.Body).Decode(&p)
+	err := json.NewDecoder(resp.Body).Decode(&user)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, "There was an error requesting the data, the API didn't send any information.")
 		return
 	}
 
-	s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("User %s has %s points.", p.NameRaw, p.Points))
+	s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("User %s has %s points.", user.DisplayName, user.Points))
 
 	return
 }
