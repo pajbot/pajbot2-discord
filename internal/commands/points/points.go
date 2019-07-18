@@ -60,7 +60,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	resp, err := http.Get("https://forsen.tv/api/v1/users/%s", target)
 	defer resp.Body.Close()
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "The user doesn't exist or you typed the nickname correctly. Mind uppercases.")
+		s.ChannelMessageSend(m.ChannelID, "The user doesn't exist or you typed the nickname incorrectly.")
 		return
 	}
 	
