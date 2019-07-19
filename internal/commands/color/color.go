@@ -61,7 +61,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	}
 	
 	// Check that role exists
-	if !colorIsValid {
+	if !colorIsValid(color) {
 		s.ChannelMessageSend(m.ChannelID, "The specified color doesn't exist. Use $colors to see what colors are available")
 		return
 	}
