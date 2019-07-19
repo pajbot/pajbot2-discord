@@ -27,7 +27,7 @@ func New() *Command {
 	}
 }
 
-func colorIsValid(c color){
+func colorIsValid(c string){
 	for _, b := range config.ColorPickerNames {
         if b == c {
             return true
