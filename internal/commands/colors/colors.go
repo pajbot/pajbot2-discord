@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	commands.Register([]string{"$roleinfo"}, New())
+	commands.Register([]string{"$colors"}, New())
 }
 
 var _ pkg.Command = &Command{}
