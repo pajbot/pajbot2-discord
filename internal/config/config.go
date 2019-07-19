@@ -15,6 +15,11 @@ var (
 	ModeratorRoles []string
 
 	MiniModeratorRoles []string
+	
+	ColorPickerRoles []string
+	
+	ColorPickerNames []string
+	ColorPickerRoleMap map[string]string
 )
 
 func init() {
@@ -27,6 +32,12 @@ func init() {
 	ModeratorRole = mustStringEnv("PAJBOT2_DISCORD_BOT_MODERATOR_ROLE")
 	AdminRole = mustStringEnv("PAJBOT2_DISCORD_BOT_ADMIN_ROLE")
 	MutedRole = mustStringEnv("PAJBOT2_DISCORD_BOT_MUTED_ROLE")
+	NitroBoosterRole = mustStringEnv("PAJBOT2_DISCORD_NITRO_BOOSTER_ROLE")
+	
+	// colors
+	ColorRedRole = mustStringEnv("PAJBOT2_DISCORD_COLOR_RED_ROLE")
+	ColorGreenRole = mustStringEnv("PAJBOT2_DISCORD_COLOR_GREEN_ROLE")
+	ColorBlueRole = mustStringEnv("PAJBOT2_DISCORD_COLOR_BLUE_ROLE")
 
 	AdminRoles = []string{
 		AdminRole,
@@ -41,5 +52,21 @@ func init() {
 		AdminRole,
 		ModeratorRole,
 		MiniModeratorRole,
+	}
+	
+	ColorPickerRoles = []string{
+		NitroBoosterRole
+	}
+	
+	ColorPickerNames = []string{
+		"red"
+		"green"
+		"blue"
+	}
+	
+	ColorPickerRoleMap = map[string]string{
+		"red": ColorRedRole
+		"green": ColorGreenRole
+		"blue": ColorBlueRole
 	}
 }
