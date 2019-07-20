@@ -7,6 +7,7 @@ import (
 	"github.com/pajbot/basecommand"
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
+	"github.com/pajbot/pajbot2-discord/pkg/utils"
 )
 
 func init() {
@@ -37,16 +38,12 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		return
 	}
 
-	response := "```"
+	var chunks []string
 	for _, role := range roles {
-		if role.Managed {
-			continue
-		}
-		response += fmt.Sprintf("%s = %s\n", role.ID, role.Name)
+		chunks = append(chunks, fmt.Sprintf("%s = %s\n", role.ID, role.Name))
 	}
-	response += "```"
 
-	s.ChannelMessageSend(m.ChannelID, response)
+	utils.SendChunks("```", "```", chunks, m.ChannelID, s)
 
 	return
 }
