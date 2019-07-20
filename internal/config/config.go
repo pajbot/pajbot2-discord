@@ -1,10 +1,19 @@
 package config
 
+const (
+	envPrefix = "PAJBOT2_DISCORD_BOT_"
+)
+
+func envName(v string) string {
+	return envPrefix + v
+}
+
 var (
 	MiniModeratorRole string
 	ModeratorRole     string
 	AdminRole         string
 	MutedRole         string
+	NitroBoosterRole  string
 
 	DSN string
 
@@ -15,29 +24,21 @@ var (
 	ModeratorRoles []string
 
 	MiniModeratorRoles []string
-	
+
 	ColorPickerRoles []string
-	
-	ColorPickerNames []string
-	ColorPickerRoleMap map[string]string
 )
 
 func init() {
-	DSN = stringEnv("PAJBOT2_DISCORD_BOT_SQL_DSN", "postgres:///pajbot2_discord?sslmode=disable")
+	DSN = stringEnv(envName("SQL_DSN"), "postgres:///pajbot2_discord?sslmode=disable")
 
-	Token = mustStringEnv("PAJBOT2_DISCORD_BOT_TOKEN")
+	Token = mustStringEnv(envName("TOKEN"))
 
 	// roles
-	MiniModeratorRole = mustStringEnv("PAJBOT2_DISCORD_BOT_MINI_MODERATOR_ROLE")
-	ModeratorRole = mustStringEnv("PAJBOT2_DISCORD_BOT_MODERATOR_ROLE")
-	AdminRole = mustStringEnv("PAJBOT2_DISCORD_BOT_ADMIN_ROLE")
-	MutedRole = mustStringEnv("PAJBOT2_DISCORD_BOT_MUTED_ROLE")
-	NitroBoosterRole = mustStringEnv("PAJBOT2_DISCORD_NITRO_BOOSTER_ROLE")
-	
-	// colors
-	ColorRedRole = mustStringEnv("PAJBOT2_DISCORD_COLOR_RED_ROLE")
-	ColorGreenRole = mustStringEnv("PAJBOT2_DISCORD_COLOR_GREEN_ROLE")
-	ColorBlueRole = mustStringEnv("PAJBOT2_DISCORD_COLOR_BLUE_ROLE")
+	MiniModeratorRole = mustStringEnv(envName("MINI_MODERATOR_ROLE"))
+	ModeratorRole = mustStringEnv(envName("MODERATOR_ROLE"))
+	AdminRole = mustStringEnv(envName("ADMIN_ROLE"))
+	MutedRole = mustStringEnv(envName("MUTED_ROLE"))
+	NitroBoosterRole = mustStringEnv(envName("NITRO_BOOSTER_ROLE"))
 
 	AdminRoles = []string{
 		AdminRole,
@@ -53,20 +54,8 @@ func init() {
 		ModeratorRole,
 		MiniModeratorRole,
 	}
-	
+
 	ColorPickerRoles = []string{
-		NitroBoosterRole
-	}
-	
-	ColorPickerNames = []string{
-		"red"
-		"green"
-		"blue"
-	}
-	
-	ColorPickerRoleMap = map[string]string{
-		"red": ColorRedRole
-		"green": ColorGreenRole
-		"blue": ColorBlueRole
+		NitroBoosterRole,
 	}
 }
