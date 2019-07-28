@@ -16,6 +16,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/pajbot2-discord/internal/config"
+	"github.com/pajbot/pajbot2-discord/internal/mute"
 	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
@@ -148,6 +149,9 @@ func main() {
 	bot.AddHandler(onMessageReactionAdded)
 	bot.AddHandler(onMessageReactionRemoved)
 	bot.AddHandler(onPresenceUpdate)
+	bot.AddHandler(func(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
+		onMemberJoin(s, m, sqlClient)
+	})
 
 	// Open a websocket connection to Discord and begin listening.
 	err = bot.Open()
@@ -157,6 +161,32 @@ func main() {
 	}
 
 	defer bot.Close()
+
+	go func() {
+		const resultFormat = "%s was unmuted (reason was %s)"
+		for {
+			<-time.After(3 * time.Second)
+			unmutedUsers, err := mute.ExpireMutes(bot, sqlClient)
+			if err != nil {
+				fmt.Println("err:", err)
+			}
+
+			for _, unmutedUser := range unmutedUsers {
+				member, err := bot.GuildMember(unmutedUser.GuildID, unmutedUser.UserID)
+				if err != nil {
+					fmt.Println("Error getting guild member:", err)
+					continue
+				}
+				resultMessage := fmt.Sprintf(resultFormat, member.Mention(), unmutedUser.Reason)
+				targetChannel := serverconfig.Get(unmutedUser.GuildID, "channel:moderation-action")
+				if targetChannel == "" {
+					fmt.Println("No channel set up for moderation actions")
+					return
+				}
+				bot.ChannelMessageSend(targetChannel, resultMessage)
+			}
+		}
+	}()
 
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
@@ -434,6 +464,23 @@ func onPresenceUpdate(s *discordgo.Session, m *discordgo.PresenceUpdate) {
 		if err != nil {
 			fmt.Println("Error copying data from request to file")
 			return
+		}
+	}
+}
+
+func onMemberJoin(s *discordgo.Session, m *discordgo.GuildMemberAdd, sqlClient *sql.DB) {
+	fmt.Println("Member joined:", *m)
+
+	muted, err := mute.IsUserMuted(sqlClient, m.User.ID)
+	if err != nil {
+		fmt.Println("Error checking user mute:", err)
+	} else {
+		if muted {
+			// Apply muted role
+			err = s.GuildMemberRoleAdd(m.GuildID, m.User.ID, config.MutedRole)
+			if err != nil {
+				fmt.Println("Error assigning role:", err)
+			}
 		}
 	}
 }

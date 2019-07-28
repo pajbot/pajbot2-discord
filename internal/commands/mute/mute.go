@@ -1,7 +1,6 @@
 package mute
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -79,22 +78,10 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	reason = strings.Join(parts[2:], " ")
 
 	// Create queued up unmute action in database
-	timepoint := time.Now().Add(duration)
+	muteEnd := time.Now().Add(duration)
 
-	action := pkg.Action{
-		Type:    "unmute",
-		GuildID: m.GuildID,
-		UserID:  target.ID,
-		RoleID:  config.MutedRole,
-	}
-	bytes, err := json.Marshal(&action)
-	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, m.Author.Mention()+" $mute unable to marshal action: "+err.Error())
-		return
-	}
-
-	query := "INSERT INTO discord_queue (action, timepoint) VALUES ($1, $2)"
-	_, err = commands.SQLClient.Exec(query, string(bytes), timepoint)
+	query := "INSERT INTO discord_mutes (guild_id, user_id, reason, mute_start, mute_end) VALUES ($1, $2, $3, NOW(), $4) ON CONFLICT (guild_id, user_id) DO UPDATE SET reason=$3, mute_end=$4"
+	_, err = commands.SQLClient.Exec(query, m.GuildID, target.ID, reason, muteEnd)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, m.Author.Mention()+" $mute sql error: "+err.Error())
 		return
@@ -106,6 +93,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		fmt.Println("Error assigning role:", err)
 	}
 
+	// TODO: result message should be different if mute was updated instead of inserted
 	const resultFormat = "%s muted %s (%s - %s) for %s. reason: %s"
 	resultMessage := fmt.Sprintf(resultFormat, m.Author.Mention(), target.Username, target.ID, target.Mention(), duration, reason)
 
