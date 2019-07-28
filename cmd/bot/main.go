@@ -38,6 +38,7 @@ import (
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/roleinfo"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/roles"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/tags"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/test"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/userid"
 )
 
