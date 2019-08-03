@@ -2,6 +2,7 @@ package ping
 
 import (
 	"fmt"
+	"math/rand"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/basecommand"
@@ -12,7 +13,13 @@ import (
 var _ pkg.Command = &Command{}
 
 func init() {
-	commands.Register([]string{"$ping"}, New())
+	commands.Register([]string{
+		"$pang",
+		"$peng",
+		"$ping",
+		"$pong",
+		"$pung",
+	}, New())
 }
 
 type Command struct {
@@ -25,8 +32,13 @@ func New() *Command {
 	}
 }
 
+var vowels = []rune{
+	'a', 'e', 'i', 'o', 'u',
+}
+
 func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) pkg.CommandResult {
-	s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%s, pong", m.Author.Mention()))
+	response := fmt.Sprintf("%s, p%cng", m.Author.Mention(), vowels[rand.Intn(len(vowels))])
+	s.ChannelMessageSend(m.ChannelID, response)
 	return pkg.CommandResultFullCooldown
 }
 
