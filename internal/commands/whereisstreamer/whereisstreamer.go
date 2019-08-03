@@ -32,7 +32,7 @@ func New() *Command {
 
 func getClient(GuildID)(*twitter.Client, error) {
 
-	if serverconfig.Get(GuildID, "twitter:username") != nil ||
+	if serverconfig.Get(GuildID, "twitter:username") == nil ||
 		config.TwitterConsumerKey == nil || config.TwitterConsumerSecret == nil || 
 		config.TwitterAccessToken == nil || config.TwitterAccessTokenSecret == nil {
 			return nil, "Twitter credentials are not correctly set in the configuration."
