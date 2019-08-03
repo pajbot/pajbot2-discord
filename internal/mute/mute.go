@@ -9,16 +9,18 @@ import (
 	"github.com/pajbot/pajbot2-discord/internal/config"
 )
 
+// MutedUser describes a user that is/was muted
 type MutedUser struct {
 	UserID  string
 	GuildID string
 	Reason  string
 }
 
-func IsUserMuted(sqlClient *sql.DB, userID string) (muted bool, err error) {
+// IsUserMuted check if there's a mute active for the given user in the given server
+func IsUserMuted(sqlClient *sql.DB, guildID, userID string) (muted bool, err error) {
 	// Check if the user is supposed to be muted
-	const query = "SELECT reason FROM discord_mutes WHERE user_id=$1"
-	row := sqlClient.QueryRow(query, userID)
+	const query = "SELECT reason FROM discord_mutes WHERE guild_id=$1 AND user_id=$2"
+	row := sqlClient.QueryRow(query, guildID, userID)
 
 	var reason string
 	err = row.Scan(&reason)
@@ -38,6 +40,9 @@ func IsUserMuted(sqlClient *sql.DB, userID string) (muted bool, err error) {
 	return
 }
 
+// ExpireMutes polls the database for any mutes that may have ended recently.
+// Any users who should be unmuted will have their "Muted" role removed, and the muted entry will be removed from the database.
+// The `unmutedUsers` return value indicates what users were unmuted, what their mute reason was, and what server they were muted in.
 func ExpireMutes(s *discordgo.Session, sqlClient *sql.DB) (unmutedUsers []MutedUser, err error) {
 	now := time.Now()
 	const query = `SELECT id, guild_id, user_id, reason, mute_end FROM discord_mutes ORDER BY mute_end ASC LIMIT 30;`

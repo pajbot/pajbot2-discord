@@ -172,6 +172,7 @@ func main() {
 				fmt.Println("err:", err)
 			}
 
+			// Report unmutes in moderation-actions channel
 			for _, unmutedUser := range unmutedUsers {
 				member, err := bot.GuildMember(unmutedUser.GuildID, unmutedUser.UserID)
 				if err != nil {
@@ -182,7 +183,7 @@ func main() {
 				targetChannel := serverconfig.Get(unmutedUser.GuildID, "channel:moderation-action")
 				if targetChannel == "" {
 					fmt.Println("No channel set up for moderation actions")
-					return
+					break
 				}
 				bot.ChannelMessageSend(targetChannel, resultMessage)
 			}
@@ -470,7 +471,7 @@ func onPresenceUpdate(s *discordgo.Session, m *discordgo.PresenceUpdate) {
 }
 
 func onMemberJoin(s *discordgo.Session, m *discordgo.GuildMemberAdd, sqlClient *sql.DB) {
-	muted, err := mute.IsUserMuted(sqlClient, m.User.ID)
+	muted, err := mute.IsUserMuted(sqlClient, m.GuildID, m.User.ID)
 	if err != nil {
 		fmt.Println("Error checking user mute:", err)
 	} else {
