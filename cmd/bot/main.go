@@ -27,6 +27,7 @@ import (
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/ban"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/channelinfo"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/channels"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/clear"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/color"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/colors"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/configure"

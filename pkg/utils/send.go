@@ -42,3 +42,38 @@ func SendChunks(prefix, suffix string, chunks []string, channelID string, s *dis
 		}
 	}
 }
+
+// SplitIntoChunks splits the data into chunks of chunkSize size
+func SplitIntoChunks(chunkSize int, data []string) (chunks [][]string) {
+	for len(data) > 0 {
+		if len(data) >= chunkSize {
+			chunks = append(chunks, data[:chunkSize])
+			data = data[chunkSize:]
+		} else {
+			chunks = append(chunks, data)
+			data = []string{}
+		}
+	}
+	return
+}
+
+// DeleteChunks will take your list of message IDs, pair them in chunks of 100, and bulk delete them
+func DeleteChunks(s *discordgo.Session, channelID string, messageIDs []string) (err error) {
+	messageIDChunks := SplitIntoChunks(100, messageIDs)
+
+	for _, chunk := range messageIDChunks {
+		if len(chunk) > 1 {
+			err = s.ChannelMessagesBulkDelete(channelID, chunk)
+			if err != nil {
+				break
+			}
+		} else {
+			err = s.ChannelMessageDelete(channelID, chunk[0])
+			if err != nil {
+				break
+			}
+		}
+	}
+
+	return
+}
