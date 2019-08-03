@@ -45,7 +45,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 
 	target := m.Mentions[0]
 
-	muted, err := mute.IsUserMuted(commands.SQLClient, target.ID)
+	muted, err := mute.IsUserMuted(commands.SQLClient, m.GuildID, target.ID)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, m.Author.Mention()+" error checking mute status: "+err.Error())
 		return
