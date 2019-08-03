@@ -40,7 +40,7 @@ func IsUserMuted(sqlClient *sql.DB, userID string) (muted bool, err error) {
 
 func ExpireMutes(s *discordgo.Session, sqlClient *sql.DB) (unmutedUsers []MutedUser, err error) {
 	now := time.Now()
-	const query = `SELECT id, guild_id, user_id, reason, mute_end FROM discord_mutes ORDER BY mute_end DESC LIMIT 30;`
+	const query = `SELECT id, guild_id, user_id, reason, mute_end FROM discord_mutes ORDER BY mute_end ASC LIMIT 30;`
 	rows, err := sqlClient.Query(query)
 	if err != nil {
 		fmt.Println("err:", err)
