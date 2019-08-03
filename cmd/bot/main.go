@@ -470,8 +470,6 @@ func onPresenceUpdate(s *discordgo.Session, m *discordgo.PresenceUpdate) {
 }
 
 func onMemberJoin(s *discordgo.Session, m *discordgo.GuildMemberAdd, sqlClient *sql.DB) {
-	fmt.Println("Member joined:", *m)
-
 	muted, err := mute.IsUserMuted(sqlClient, m.User.ID)
 	if err != nil {
 		fmt.Println("Error checking user mute:", err)
