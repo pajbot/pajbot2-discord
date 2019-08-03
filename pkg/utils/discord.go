@@ -1,13 +1,52 @@
 package utils
 
 import (
+	"errors"
 	"regexp"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/pajbot/pajbot2-discord/internal/roles"
 )
 
+// MemberAdmin returns true if the given user id is an admin
+func MemberAdmin(s *discordgo.Session, guildID, userID string) (bool, error) {
+	member, err := s.State.Member(guildID, userID)
+	if err != nil {
+		if member, err = s.GuildMember(guildID, userID); err != nil {
+			return false, err
+		}
+	}
+
+	guild, err := s.Guild(guildID)
+	if err != nil {
+		return false, err
+	}
+	if guild.OwnerID == userID {
+		return true, nil
+	}
+
+	// Iterate through the role IDs stored in member.Roles
+	// to check permissions
+	for _, roleID := range member.Roles {
+		role, err := s.State.Role(guildID, roleID)
+		if err != nil {
+			return false, err
+		}
+		if role.Permissions&discordgo.PermissionAdministrator != 0 {
+			return true, nil
+		}
+	}
+
+	return MemberInRoles(s, guildID, userID, "admin")
+}
+
 // MemberInRoles returns true if the given user id is in one of the given roles
-func MemberInRoles(s *discordgo.Session, guildID string, userID string, roles []string) (bool, error) {
+func MemberInRoles(s *discordgo.Session, guildID, userID, role string) (bool, error) {
+	roles := roles.Get(guildID, role)
+	if len(roles) == 0 {
+		return false, errors.New("No roles set up")
+	}
+
 	member, err := s.State.Member(guildID, userID)
 	if err != nil {
 		if member, err = s.GuildMember(guildID, userID); err != nil {

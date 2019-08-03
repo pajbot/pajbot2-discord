@@ -67,24 +67,7 @@ func init() {
 
 	commands.SQLClient = sqlClient
 
-	// Load channel roles from config
-	const query = "SELECT server_id, key, value FROM config"
-	rows, err := sqlClient.Query(query)
-	if err != nil {
-		fmt.Println("Error loading channel roles:", err)
-		os.Exit(1)
-	}
-
-	for rows.Next() {
-		var serverID, key, value string
-		err := rows.Scan(&serverID, &key, &value)
-		if err != nil {
-			fmt.Println("Error scanning channel roles:", err)
-			os.Exit(1)
-		}
-
-		serverconfig.Set(serverID, key, value)
-	}
+	serverconfig.Load(sqlClient)
 }
 
 func main() {
@@ -472,16 +455,8 @@ func onPresenceUpdate(s *discordgo.Session, m *discordgo.PresenceUpdate) {
 }
 
 func onMemberJoin(s *discordgo.Session, m *discordgo.GuildMemberAdd, sqlClient *sql.DB) {
-	muted, err := mute.IsUserMuted(sqlClient, m.GuildID, m.User.ID)
+	err := mute.ReapplyMute(s, sqlClient, m)
 	if err != nil {
-		fmt.Println("Error checking user mute:", err)
-	} else {
-		if muted {
-			// Apply muted role
-			err = s.GuildMemberRoleAdd(m.GuildID, m.User.ID, config.MutedRole)
-			if err != nil {
-				fmt.Println("Error assigning role:", err)
-			}
-		}
+		fmt.Println("Error when seeing if we need to reapply mute:", err)
 	}
 }

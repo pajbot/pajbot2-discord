@@ -2,11 +2,12 @@ package mute
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/pajbot/pajbot2-discord/internal/config"
+	"github.com/pajbot/pajbot2-discord/internal/roles"
 )
 
 // MutedUser describes a user that is/was muted
@@ -72,7 +73,13 @@ func ExpireMutes(s *discordgo.Session, sqlClient *sql.DB) (unmutedUsers []MutedU
 			return
 		}
 
-		err = s.GuildMemberRoleRemove(user.GuildID, user.UserID, config.MutedRole)
+		mutedRole := roles.GetSingle(user.GuildID, "muted")
+		if mutedRole == "" {
+			fmt.Println("No muted role set up in", user.GuildID)
+			continue
+		}
+
+		err = s.GuildMemberRoleRemove(user.GuildID, user.UserID, mutedRole)
 		if err != nil {
 			fmt.Println("Error removing role")
 			continue
@@ -84,4 +91,27 @@ func ExpireMutes(s *discordgo.Session, sqlClient *sql.DB) (unmutedUsers []MutedU
 	}
 
 	return
+}
+
+func ReapplyMute(s *discordgo.Session, sqlClient *sql.DB, m *discordgo.GuildMemberAdd) error {
+	muted, err := IsUserMuted(sqlClient, m.GuildID, m.User.ID)
+	if err != nil {
+		fmt.Println("Error checking user mute:", err)
+		return err
+	}
+
+	if muted {
+		mutedRole := roles.GetSingle(m.GuildID, "muted")
+		if mutedRole == "" {
+			return errors.New("No muted role set up")
+		}
+
+		// Reapply muted role
+		err = s.GuildMemberRoleAdd(m.GuildID, m.User.ID, mutedRole)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
