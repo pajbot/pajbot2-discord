@@ -114,8 +114,23 @@ func main() {
 				case "unmute":
 					err = bot.GuildMemberRoleRemove(action.GuildID, action.UserID, action.RoleID)
 					if err != nil {
-						fmt.Println("Error removing role")
-						continue
+						if rErr, ok := err.(*discordgo.RESTError); ok {
+							if rErr.Message != nil {
+								dErr := rErr.Message
+								if dErr.Code == 10007 {
+									// User not in server anymore
+								} else {
+									fmt.Println("1 Error removing role", err, dErr.Code)
+									continue
+								}
+							} else {
+								fmt.Println("2 Error removing role", err)
+								continue
+							}
+						} else {
+							fmt.Println("3 Error removing role", err)
+							continue
+						}
 					}
 
 					actionsToRemove = append(actionsToRemove, id)

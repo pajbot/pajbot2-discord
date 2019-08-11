@@ -81,8 +81,23 @@ func ExpireMutes(s *discordgo.Session, sqlClient *sql.DB) (unmutedUsers []MutedU
 
 		err = s.GuildMemberRoleRemove(user.GuildID, user.UserID, mutedRole)
 		if err != nil {
-			fmt.Println("Error removing role")
-			continue
+			if rErr, ok := err.(*discordgo.RESTError); ok {
+				if rErr.Message != nil {
+					dErr := rErr.Message
+					if dErr.Code == 10007 {
+						// User not in server anymore
+					} else {
+						fmt.Println("4 Error removing role", err, dErr.Code)
+						continue
+					}
+				} else {
+					fmt.Println("5 Error removing role", err)
+					continue
+				}
+			} else {
+				fmt.Println("6 Error removing role", err)
+				continue
+			}
 		}
 
 		unmutedUsers = append(unmutedUsers, user)
