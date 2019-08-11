@@ -1,9 +1,9 @@
 module github.com/pajbot/pajbot2-discord
 
-go 1.12
-
 require (
 	github.com/bwmarrin/discordgo v0.19.0
+	github.com/dghubble/go-twitter v0.0.0-20190719072343-39e5462e111f
+	github.com/dghubble/oauth1 v0.6.0
 	github.com/lib/pq v1.1.1
 	github.com/pajbot/basecommand v1.0.0
 	github.com/pajbot/commandmatcher v1.0.0

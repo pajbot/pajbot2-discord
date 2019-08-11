@@ -28,6 +28,31 @@ func New() *Command {
 	}
 }
 
+func (c *Command) configureTwitter(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
+	const usage = "usage: $configure twitter KEY(username) VALUE"
+	if len(parts) < 3 {
+		s.ChannelMessageSend(m.ChannelID, usage)
+		return
+	}
+	key := parts[1]
+	value := parts[2]
+
+	switch key {
+	case "username":
+	default:
+		s.ChannelMessageSend(m.ChannelID, "Invalid key argument. "+usage)
+		return
+	}
+
+	key = "twitter:" + key
+
+	err := serverconfig.Save(commands.SQLClient, m.GuildID, key, value)
+	if err != nil {
+		log.Println("SQL Error in set:", err)
+		return
+	}
+}
+
 func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) (res pkg.CommandResult) {
 	const usage = "usage: $configure TYPE KEY VALUE"
 	res = pkg.CommandResultNoCooldown
@@ -52,6 +77,9 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 
 	// config type decides how we read the value
 	switch configType {
+	case "twitter":
+		c.configureTwitter(s, m, parts)
+
 	case "channel":
 		const usage = "usage: $configure channel CHANNEL_ROLE VALUE(here/reset/get)"
 		if len(parts) < 3 {

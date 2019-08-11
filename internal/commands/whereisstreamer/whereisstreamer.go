@@ -1,79 +1,88 @@
 package whereisstreamer
 
 import (
+	"errors"
 	"fmt"
-	
-	"github.com/dghubble/go-twitter"
+	"log"
+
+	"github.com/dghubble/go-twitter/twitter"
 	"github.com/dghubble/oauth1"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/basecommand"
-	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
 	"github.com/pajbot/pajbot2-discord/internal/config"
+	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
 )
 
 func init() {
-	commands.Register([]string{"$whereisclown"}, New())
+	commands.Register([]string{"$whereisclown", "$whereisstreamer"}, New())
 }
 
 var _ pkg.Command = &Command{}
 
 type Command struct {
 	basecommand.Command
+
+	client *twitter.Client
 }
 
 func New() *Command {
-	return &Command{
+	c := &Command{
 		Command: basecommand.New(),
 	}
-}
 
-func getClient(GuildID)(*twitter.Client, error) {
-
-	if serverconfig.Get(GuildID, "twitter:username") == nil ||
-		config.TwitterConsumerKey == nil || config.TwitterConsumerSecret == nil || 
-		config.TwitterAccessToken == nil || config.TwitterAccessTokenSecret == nil {
-			return nil, "Twitter credentials are not correctly set in the configuration."
+	client, err := getClient()
+	if err != nil {
+		return nil
 	}
 
-    config := oauth1.NewConfig(config.TwitterConsumerKey, config.TwitterConsumerSecret)
-    token := oauth1.NewToken(config.TwitterAccessToken, config.TwitterAccessTokenSecret)
+	c.client = client
 
-    httpClient := config.Client(oauth1.NoContext, token)
-    client := twitter.NewClient(httpClient)
+	return c
+}
 
-    // Verify Credentials
-    verifyParams := &twitter.AccountVerifyParams{
-        SkipStatus:   twitter.Bool(true),
-        IncludeEmail: twitter.Bool(true),
-    }
+func getClient() (*twitter.Client, error) {
+	if config.TwitterConsumerKey == "" || config.TwitterConsumerSecret == "" ||
+		config.TwitterAccessToken == "" || config.TwitterAccessTokenSecret == "" {
+		return nil, errors.New("twitter credentials are not correctly set in the configuration")
+	}
 
-    // verify
-    user, _, err := client.Accounts.VerifyCredentials(verifyParams)
-    if err != nil {
-        return nil, err
-    }
+	oauthConfig := oauth1.NewConfig(config.TwitterConsumerKey, config.TwitterConsumerSecret)
+	token := oauth1.NewToken(config.TwitterAccessToken, config.TwitterAccessTokenSecret)
 
-    return client, nil
+	httpClient := oauthConfig.Client(oauth1.NoContext, token)
+	client := twitter.NewClient(httpClient)
+
+	// Verify Credentials
+	verifyParams := &twitter.AccountVerifyParams{
+		SkipStatus:   twitter.Bool(true),
+		IncludeEmail: twitter.Bool(true),
+	}
+
+	// verify
+	_, _, err := client.Accounts.VerifyCredentials(verifyParams)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
 }
 
 func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) (res pkg.CommandResult) {
 	res = pkg.CommandResultUserCooldown
-	
-	client, err := getClient(m.GuildID)
-	
-	if err != nil {
-		log.Println("Error getting Twitter Client. Verify credentials configuration.")
+
+	twitterUsername := serverconfig.Get(m.GuildID, "twitter:username")
+	if twitterUsername == "" {
 		return
 	}
-	
-	tweets, resp, err := client.Timelines.UserTimeline(&twitter.UserTimelineParams{
-		ScreenName: serverconfig.Get(GuildID, "twitter:username"),
-		ExcludeReplies: true,
-		IncludeRetweets: false,
-		Count: 1
+
+	tweets, _, err := c.client.Timelines.UserTimeline(&twitter.UserTimelineParams{
+		ScreenName:      twitterUsername,
+		ExcludeReplies:  twitter.Bool(true),
+		IncludeRetweets: twitter.Bool(false),
+		Count:           1,
 	})
 
 	if err != nil {
@@ -81,14 +90,14 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		log.Println(err)
 		return
 	}
-	
+
 	if len(tweets) < 1 {
 		s.ChannelMessageSend(m.ChannelID, "There was an error requesting the tweet information.")
 		return
 	}
 
-	const resultFormat = "Last tweet from clown: https://twitter.com/%s/status/%s"
-	resultMessage := fmt.Sprintf(resultFormat, serverconfig.Get(GuildID, "twitter:username"), tweets[0].id)
+	const resultFormat = "Last tweet from clown: https://twitter.com/%s/status/%d"
+	resultMessage := fmt.Sprintf(resultFormat, twitterUsername, tweets[0].ID)
 
 	s.ChannelMessageSend(m.ChannelID, resultMessage)
 
