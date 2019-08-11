@@ -41,6 +41,7 @@ import (
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/tags"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/test"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/userid"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/whereisstreamer"
 )
 
 var sqlClient *sql.DB
