@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"fmt"
+
 	"github.com/pajbot/commandmatcher"
 	"github.com/pajbot/pajbot2-discord/pkg"
 )
@@ -10,6 +12,10 @@ var (
 )
 
 func Register(aliases []string, command pkg.Command) {
+	if command == nil {
+		fmt.Println("Error registering command", aliases)
+		return
+	}
 	c.Register(aliases, command)
 }
 
