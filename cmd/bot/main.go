@@ -146,6 +146,7 @@ func main() {
 
 	bot.AddHandler(onMessage)
 	bot.AddHandler(onMessageDeleted)
+	bot.AddHandler(onMessageEdited)
 	bot.AddHandler(onUserBanned)
 	bot.AddHandler(onMessageReactionAdded)
 	bot.AddHandler(onMessageReactionRemoved)
@@ -196,8 +197,8 @@ func main() {
 	<-sc
 }
 
-func pushMessageIntoDatabase(m *discordgo.MessageCreate) (err error) {
-	const query = `INSERT INTO discord_messages (id, content, author_id) VALUES ($1, $2, $3)`
+func pushMessageIntoDatabase(m *discordgo.Message) (err error) {
+	const query = `INSERT INTO discord_messages (id, content, author_id) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET content=$2`
 	authorID := "unknown"
 	if m.Author != nil {
 		authorID = m.Author.ID
@@ -215,7 +216,7 @@ func getMessageFromDatabase(messageID string) (content string, authorID string, 
 
 func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// push message into database
-	err := pushMessageIntoDatabase(m)
+	err := pushMessageIntoDatabase(m.Message)
 	if err != nil {
 		log.Println("Error pushing message into databasE:", err)
 	}
@@ -244,6 +245,72 @@ func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 		} else if f, ok := c.(func(s *discordgo.Session, m *discordgo.MessageCreate, parts []string)); ok {
 			f(s, m, parts)
 		}
+	}
+}
+
+func onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) {
+	messageContent, authorID, err := getMessageFromDatabase(m.ID)
+	if err != nil {
+		fmt.Println("Error getting full message")
+	}
+	targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
+	if targetChannel == "" {
+		fmt.Println("No channel set up for action log")
+		return
+	}
+
+	// Try to get member
+	var member *discordgo.Member
+	if authorID != "unknown" {
+		member, err = s.GuildMember(m.GuildID, authorID)
+		if err != nil {
+			fmt.Println("Error getting guild member:", err)
+		}
+	}
+
+	embed := &discordgo.MessageEmbed{
+		Title: "Message edited",
+	}
+
+	if member != nil {
+		payload := fmt.Sprintf("<@%s> - Name: %s#%s - ID: %s", authorID, member.User.Username, member.User.Discriminator, authorID)
+		if member.Nick != "" {
+			payload += " Nickname: " + member.Nick
+		}
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "Author",
+			Value:  payload,
+			Inline: true,
+		})
+	} else {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "Author",
+			Value:  "unknown",
+			Inline: true,
+		})
+	}
+	if messageContent != "" {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "Old message",
+			Value:  strings.Replace(messageContent, "`", "", -1),
+			Inline: true,
+		})
+	}
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "New message",
+		Value:  strings.Replace(m.Content, "`", "", -1),
+		Inline: true,
+	})
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "Channel",
+		Value:  "<#" + m.ChannelID + ">",
+		Inline: true,
+	})
+	s.ChannelMessageSendEmbed(targetChannel, embed)
+
+	err = pushMessageIntoDatabase(m.Message)
+	if err != nil {
+		log.Println("Error pushing message into databasE (from edit):", err)
 	}
 }
 
