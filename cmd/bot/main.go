@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -10,7 +11,9 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -20,6 +23,7 @@ import (
 	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
+	"github.com/pajbot/pajbot2-discord/pkg/utils"
 	"github.com/pajlada/stupidmigration"
 
 	_ "github.com/lib/pq"
@@ -42,6 +46,11 @@ import (
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/test"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/userid"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/whereisstreamer"
+)
+
+const (
+	timeToKeepLocalAttachments    = 10 * time.Minute
+	timeBetweenAttachmentCleanups = 15 * time.Minute
 )
 
 var sqlClient *sql.DB
@@ -72,6 +81,8 @@ func init() {
 }
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	bot, err := discordgo.New("Bot " + config.Token)
 	if err != nil {
 		fmt.Println("error creating Discord session,", err)
@@ -191,6 +202,8 @@ func main() {
 		}
 	}()
 
+	startCleanUpAttachments(ctx)
+
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
@@ -214,7 +227,38 @@ func getMessageFromDatabase(messageID string) (content string, authorID string, 
 	return
 }
 
+var attachments = map[string][]*discordgo.MessageAttachment{}
+var attachmentsMutex = sync.Mutex{}
+
 func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
+	for _, a := range m.Message.Attachments {
+		attachmentsMutex.Lock()
+		attachments[m.Message.ID] = append(attachments[m.Message.ID], a)
+		attachmentsMutex.Unlock()
+		attachmentLocalPath := filepath.Join("attachments", fmt.Sprintf("%s-%s", a.ID, a.Filename))
+
+		if _, err := os.Stat(attachmentLocalPath); os.IsNotExist(err) {
+			resp, err := http.Get(a.URL)
+			if err != nil {
+				fmt.Println("Error getting avatar at url", a.URL)
+				return
+			}
+			defer resp.Body.Close()
+
+			f, err := os.Create(attachmentLocalPath)
+			if err != nil {
+				fmt.Println("Error opening avatar file locally", attachmentLocalPath)
+				return
+			}
+			defer f.Close()
+			_, err = io.Copy(f, resp.Body)
+			if err != nil {
+				fmt.Println("Error copying data from request to file")
+				return
+			}
+		}
+	}
+
 	// push message into database
 	err := pushMessageIntoDatabase(m.Message)
 	if err != nil {
@@ -314,8 +358,85 @@ func onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) {
 	}
 }
 
+func cleanUpAttachments() {
+	// attachmentsMutex.Lock()
+	// for i, a := range attachments {
+	// 	// TODO: delete old attachments
+	// }
+	// attachmentsMutex.Unlock()
+
+	fmt.Println("clean up attachments")
+	attachmentsFolder := filepath.Join("attachments", "*")
+	files, err := filepath.Glob(attachmentsFolder)
+	if err != nil {
+		fmt.Println("ERROR CLEANING UP ATTACHMENTS:", err)
+		return
+	}
+	for _, path := range files {
+		fi, err := os.Stat(path)
+		if err != nil {
+			fmt.Println("Error stating file:", path)
+			continue
+		}
+
+		if time.Now().After(fi.ModTime().Add(timeToKeepLocalAttachments)) {
+			fmt.Println("Deleting attachment", path)
+			err := os.Remove(path)
+			if err != nil {
+				fmt.Println("Error deleting attachment", path, ":", err)
+				continue
+			}
+		}
+	}
+}
+
+func startCleanUpAttachments(ctx context.Context) {
+	go func() {
+		cleanUpAttachments()
+		ticker := time.NewTicker(timeBetweenAttachmentCleanups)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				cleanUpAttachments()
+			}
+		}
+	}()
+}
+
+type localAttachment struct {
+	reader   io.Reader
+	filename string
+}
+
 // TODO: Don't list messages deleted from or by ourselves (this bot account)
 func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
+	creationTime, err := utils.CreationTime(m.ID)
+	if err != nil {
+		panic(err)
+	}
+	var attachmentsToSend []localAttachment
+	if time.Now().Before(creationTime.Add(timeToKeepLocalAttachments)) {
+		if messageAttachments, ok := attachments[m.Message.ID]; ok {
+			for _, a := range messageAttachments {
+				attachmentLocalPath := filepath.Join("attachments", fmt.Sprintf("%s-%s", a.ID, a.Filename))
+				file, err := os.Open(attachmentLocalPath)
+				if err != nil {
+					fmt.Println("Error opening file", err)
+					continue
+				}
+
+				attachmentsToSend = append(attachmentsToSend, localAttachment{
+					reader:   file,
+					filename: a.Filename,
+				})
+
+				// TODO: Wait with posting the message deleted message until we're done downloading all attachments
+			}
+		}
+	}
 	var authorID string
 	messageContent, authorID, err := getMessageFromDatabase(m.ID)
 	if err != nil {
@@ -325,6 +446,11 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 	targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
 	if targetChannel == "" {
 		fmt.Println("No channel set up for action log")
+		return
+	}
+
+	if targetChannel == m.ChannelID {
+		// Skipping messages deleted from the action log channel itself
 		return
 	}
 
@@ -369,6 +495,10 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 		Inline: true,
 	})
 	s.ChannelMessageSendEmbed(targetChannel, embed)
+	for i, file := range attachmentsToSend {
+		content := fmt.Sprintf("Attachment %d/%d for message %s\nPosted by Name: %s#%s - ID: %s", i+1, len(attachmentsToSend), m.ID, member.User.Username, member.User.Discriminator, authorID)
+		s.ChannelFileSendWithMessage(targetChannel, content, file.filename, file.reader)
+	}
 }
 
 func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
