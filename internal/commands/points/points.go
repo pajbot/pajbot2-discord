@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"url"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/basecommand"
@@ -22,21 +23,9 @@ type Command struct {
 }
 
 type User struct {
-	ID                   int64  `json:"id"`
-	Name                 string `json:"username"`
-	DisplayName          string `json:"username_raw"`
+	DisplayName          string `json:"name"`
 	Points               int64  `json:"points"`
-	NlRank               int    `json:"nl_rank"`
-	PointsRank           int    `json:"points_rank"`
-	Level                int    `json:"level"`
-	LastSeen             string `json:"last_seen"`
-	LastActive           string `json:"last_active"`
-	Subscriber           bool   `json:"subscriber"`
-	NumLines             int    `json:"num_lines"`
-	MinutesInChatOffline int    `json:"minutes_in_chat_offline"`
-	MinutesInChatOnline  int    `json:"minutes_in_chat_online"`
-	Banned               bool   `json:"banned"`
-	Ignored              bool   `json:"ignored"`
+	PointsRank           int64  `json:"points_rank"`
 }
 
 func New() *Command {
@@ -49,33 +38,42 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	res = pkg.CommandResultUserCooldown
 
 	if len(parts) < 2 {
-		s.ChannelMessageSend(m.ChannelID, "You need to provide a twitch username. usage: $points <username>")
+		s.ChannelMessageSend(m.ChannelID, "You need to provide a twitch username. usage: `$points <username>`")
 		return
 	}
 
 	target := parts[1]
 
-	resp, err := http.Get(fmt.Sprintf("https://forsen.tv/api/v1/users/%s", target))
+	resp, err := http.Get(fmt.Sprintf("https://forsen.tv/api/v1/users/%s?user_input=true", url.PathEscape(target)))
 	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "There was an error getting that user's data: " + err.Error())
+		return
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
 		s.ChannelMessageSend(m.ChannelID, "The user doesn't exist or you typed the nickname incorrectly.")
 		return
 	}
-	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		s.ChannelMessageSend(m.ChannelID, "There was an error getting that user's data: The API returned status code " + resp.StatusCode)
+		return
+	}
 
 	var user User
 
 	err = json.NewDecoder(resp.Body).Decode(&user)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "There was an error requesting the data, the API didn't send any information."+err.Error())
+		s.ChannelMessageSend(m.ChannelID, "There was an error parsing the response from the API: " + err.Error())
 		return
 	}
 
-	const resultFormat = "%s, user %s has %d points."
-	resultMessage := fmt.Sprintf(resultFormat, m.Author.Mention(), user.DisplayName, user.Points)
+	const resultFormat = "%s, user %s has %d points and is ranked %d."
+	resultMessage := fmt.Sprintf(resultFormat, m.Author.Mention(), user.DisplayName, user.Points, user.PointsRank)
 
 	s.ChannelMessageSend(m.ChannelID, resultMessage)
-
-	return
 }
 
 func (c *Command) Description() string {
