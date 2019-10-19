@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"url"
+	"net/url"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/basecommand"
@@ -23,9 +23,9 @@ type Command struct {
 }
 
 type User struct {
-	DisplayName          string `json:"name"`
-	Points               int64  `json:"points"`
-	PointsRank           int64  `json:"points_rank"`
+	DisplayName string `json:"name"`
+	Points      int64  `json:"points"`
+	PointsRank  int64  `json:"points_rank"`
 }
 
 func New() *Command {
@@ -46,7 +46,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 
 	resp, err := http.Get(fmt.Sprintf("https://forsen.tv/api/v1/users/%s?user_input=true", url.PathEscape(target)))
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "There was an error getting that user's data: " + err.Error())
+		s.ChannelMessageSend(m.ChannelID, "There was an error getting that user's data: "+err.Error())
 		return
 	}
 
@@ -58,7 +58,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	}
 
 	if resp.StatusCode >= 400 {
-		s.ChannelMessageSend(m.ChannelID, "There was an error getting that user's data: The API returned status code " + resp.StatusCode)
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("There was an error getting that user's data: The API returned status code %d", resp.StatusCode))
 		return
 	}
 
@@ -66,7 +66,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 
 	err = json.NewDecoder(resp.Body).Decode(&user)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "There was an error parsing the response from the API: " + err.Error())
+		s.ChannelMessageSend(m.ChannelID, "There was an error parsing the response from the API: "+err.Error())
 		return
 	}
 
@@ -74,6 +74,8 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	resultMessage := fmt.Sprintf(resultFormat, m.Author.Mention(), user.DisplayName, user.Points, user.PointsRank)
 
 	s.ChannelMessageSend(m.ChannelID, resultMessage)
+
+	return
 }
 
 func (c *Command) Description() string {
