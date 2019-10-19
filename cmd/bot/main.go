@@ -230,7 +230,57 @@ func getMessageFromDatabase(messageID string) (content string, authorID string, 
 var attachments = map[string][]*discordgo.MessageAttachment{}
 var attachmentsMutex = sync.Mutex{}
 
+const noInvites = true
+
 func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
+	// Ignore messages from bots
+	if m.Message.Author.Bot {
+		return
+	}
+
+	if inviteCode, ok := utils.ResolveInviteCode(m.Message.Content); ok && inviteCode != "forsen" {
+		hasAccess, err := utils.MemberInRoles(s, m.GuildID, m.Author.ID, "minimod")
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		if !hasAccess {
+			err := s.ChannelMessageDelete(m.Message.ChannelID, m.Message.ID)
+			if err != nil {
+				fmt.Println("Error deleting message")
+			}
+			embed := &discordgo.MessageEmbed{
+				Title: "Message deleted because it contained a server invite",
+			}
+			payload := fmt.Sprintf("<@%s> - Name: %s#%s - ID: %s", m.Author.ID, m.Author.Username, m.Author.Discriminator, m.Author.ID)
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+				Name:   "Author",
+				Value:  payload,
+				Inline: true,
+			})
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+				Name:   "Content",
+				Value:  strings.Replace(m.Content, "`", "", -1),
+				Inline: true,
+			})
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+				Name:   "Channel",
+				Value:  "<#" + m.ChannelID + ">",
+				Inline: true,
+			})
+
+			targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
+			if targetChannel == "" {
+				fmt.Println("No channel set up for moderation actions")
+				return
+			}
+
+			// Announce mute in moderation-action channel
+			s.ChannelMessageSendEmbed(targetChannel, embed)
+			return
+		}
+	}
+
 	for _, a := range m.Message.Attachments {
 		attachmentsMutex.Lock()
 		attachments[m.Message.ID] = append(attachments[m.Message.ID], a)
@@ -355,6 +405,49 @@ func onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) {
 	err = pushMessageIntoDatabase(m.Message)
 	if err != nil {
 		log.Println("Error pushing message into databasE (from edit):", err)
+	}
+
+	if inviteCode, ok := utils.ResolveInviteCode(m.Message.Content); ok && inviteCode != "forsen" {
+		hasAccess, err := utils.MemberInRoles(s, m.GuildID, m.Author.ID, "minimod")
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		if !hasAccess {
+			err := s.ChannelMessageDelete(m.Message.ChannelID, m.Message.ID)
+			if err != nil {
+				fmt.Println("Error deleting message")
+			}
+			embed := &discordgo.MessageEmbed{
+				Title: "Message deleted because it contained a server invite",
+			}
+			payload := fmt.Sprintf("<@%s> - Name: %s#%s - ID: %s", m.Author.ID, m.Author.Username, m.Author.Discriminator, m.Author.ID)
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+				Name:   "Author",
+				Value:  payload,
+				Inline: true,
+			})
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+				Name:   "Content",
+				Value:  strings.Replace(m.Content, "`", "", -1),
+				Inline: true,
+			})
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+				Name:   "Channel",
+				Value:  "<#" + m.ChannelID + ">",
+				Inline: true,
+			})
+
+			targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
+			if targetChannel == "" {
+				fmt.Println("No channel set up for moderation actions")
+				return
+			}
+
+			// Announce mute in moderation-action channel
+			s.ChannelMessageSendEmbed(targetChannel, embed)
+			return
+		}
 	}
 }
 

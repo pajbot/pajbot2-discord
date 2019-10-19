@@ -116,3 +116,14 @@ func CreationTime(ID string) (t time.Time, err error) {
 	t = time.Unix(timestamp/1000, 0)
 	return
 }
+
+var inviteRegex = regexp.MustCompile(`(?i)discord(?:app\.com\/invite|\.gg(?:\/invite)?)\/([\w-]{2,255})`)
+
+func ResolveInviteCode(content string) (inviteCode string, ok bool) {
+	matches := inviteRegex.FindStringSubmatch(content)
+	if len(matches) >= 2 {
+		return matches[1], true
+	}
+
+	return "", false
+}
