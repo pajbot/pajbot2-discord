@@ -28,6 +28,7 @@ import (
 
 	_ "github.com/lib/pq"
 
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/accountage"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/ban"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/channelinfo"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/channels"
