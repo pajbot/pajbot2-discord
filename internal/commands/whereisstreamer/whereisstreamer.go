@@ -17,7 +17,10 @@ import (
 )
 
 func init() {
-	commands.Register([]string{"$whereisclown", "$whereisstreamer"}, New())
+	cmd := New()
+	if cmd != nil {
+		commands.Register([]string{"$whereisclown", "$whereisstreamer"}, cmd)
+	}
 }
 
 var _ pkg.Command = &Command{}
