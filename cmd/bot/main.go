@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -18,6 +17,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/pajbot/pajbot2-discord/internal/autoreact"
 	"github.com/pajbot/pajbot2-discord/internal/config"
 	"github.com/pajbot/pajbot2-discord/internal/mute"
 	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
@@ -162,7 +162,6 @@ func main() {
 	bot.AddHandler(onUserBanned)
 	bot.AddHandler(onMessageReactionAdded)
 	bot.AddHandler(onMessageReactionRemoved)
-	bot.AddHandler(onPresenceUpdate)
 	bot.AddHandler(func(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 		onMemberJoin(s, m, sqlClient)
 	})
@@ -318,6 +317,14 @@ func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	if m.Author.ID == s.State.User.ID {
 		return
+	}
+
+	autoReactIDs := autoreact.Get(m.GuildID, m.ChannelID)
+	for _, emojiID := range autoReactIDs {
+		err := s.MessageReactionAdd(m.ChannelID, m.ID, emojiID)
+		if err != nil {
+			fmt.Println("ERR REACT:", err)
+		}
 	}
 
 	c, parts := commands.Match(m.Content)
@@ -707,56 +714,6 @@ func onMessageReactionRemoved(s *discordgo.Session, m *discordgo.MessageReaction
 				return
 			}
 			// s.ChannelMessageSend(m.ChannelID, "removed permission")
-		}
-	}
-}
-
-func onPresenceUpdate(s *discordgo.Session, m *discordgo.PresenceUpdate) {
-	return
-
-	fmt.Println("Presence update:", *m)
-	fmt.Println("Presence update:", m.Roles)
-	if m.User != nil {
-		fmt.Println("User", *m.User)
-	}
-	fmt.Println("Status", m.Status)
-	if m.Game != nil {
-		fmt.Println("Game", m.Game)
-	}
-	fmt.Println("Nick", m.Nick)
-
-	user, err := s.User(m.User.ID)
-	if err != nil {
-		fmt.Println("Error getting user:", err)
-		return
-	}
-
-	avatarURL := user.AvatarURL("")
-	fmt.Println("Avatar URL:", avatarURL)
-
-	filename := path.Base(avatarURL)
-
-	if _, err := os.Stat(filename); err == nil {
-		// already exists
-		return
-	} else if os.IsNotExist(err) {
-		resp, err := http.Get(avatarURL)
-		if err != nil {
-			fmt.Println("Error getting avatar at url", avatarURL)
-			return
-		}
-		defer resp.Body.Close()
-
-		f, err := os.Create(filename)
-		if err != nil {
-			fmt.Println("Error opening avatar file locally", filename)
-			return
-		}
-		defer f.Close()
-		_, err = io.Copy(f, resp.Body)
-		if err != nil {
-			fmt.Println("Error copying data from request to file")
-			return
 		}
 	}
 }
