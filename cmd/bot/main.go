@@ -353,7 +353,7 @@ func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 func onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) {
 	messageContent, authorID, err := getMessageFromDatabase(m.ID)
 	if err != nil {
-		fmt.Println("Error getting full message")
+		fmt.Println("on message edit: Error getting full message")
 	}
 	targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
 	if targetChannel == "" {
@@ -541,7 +541,7 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 	var authorID string
 	messageContent, authorID, err := getMessageFromDatabase(m.ID)
 	if err != nil {
-		fmt.Println("Error getting full message")
+		fmt.Println("on message deleted: Error getting full message")
 	}
 
 	targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
