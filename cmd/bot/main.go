@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -90,72 +89,6 @@ func main() {
 		return
 	}
 
-	go func() {
-		for {
-			<-time.After(3 * time.Second)
-			now := time.Now()
-			const query = `SELECT id, action, timepoint FROM discord_queue ORDER BY timepoint DESC LIMIT 30;`
-			rows, err := sqlClient.Query(query)
-			if err != nil {
-				fmt.Println("err:", err)
-				continue
-			}
-			var actionsToRemove []int64
-			defer rows.Close()
-			for rows.Next() {
-				var (
-					id           int64
-					actionString string
-					timepoint    time.Time
-				)
-				if err := rows.Scan(&id, &actionString, &timepoint); err != nil {
-					fmt.Println("Error scanning:", err)
-				}
-				if timepoint.After(now) {
-					continue
-				}
-
-				var action pkg.Action
-				err = json.Unmarshal([]byte(actionString), &action)
-				if err != nil {
-					fmt.Println("Error unmarshaling action:", err)
-					continue
-				}
-				fmt.Println("Perform", action.Type)
-
-				switch action.Type {
-				case "unmute":
-					err = bot.GuildMemberRoleRemove(action.GuildID, action.UserID, action.RoleID)
-					if err != nil {
-						if rErr, ok := err.(*discordgo.RESTError); ok {
-							if rErr.Message != nil {
-								dErr := rErr.Message
-								if dErr.Code == 10007 {
-									// User not in server anymore
-								} else {
-									fmt.Println("1 Error removing role", err, dErr.Code)
-									continue
-								}
-							} else {
-								fmt.Println("2 Error removing role", err)
-								continue
-							}
-						} else {
-							fmt.Println("3 Error removing role", err)
-							continue
-						}
-					}
-
-					actionsToRemove = append(actionsToRemove, id)
-				}
-			}
-
-			for _, actionID := range actionsToRemove {
-				sqlClient.Exec("DELETE FROM discord_queue WHERE id=$1", actionID)
-			}
-		}
-	}()
-
 	bot.AddHandler(onMessage)
 	bot.AddHandler(onMessageDeleted)
 	bot.AddHandler(onMessageEdited)
@@ -175,38 +108,16 @@ func main() {
 
 	defer bot.Close()
 
-	go func() {
-		const resultFormat = "%s was unmuted (reason was %s)"
-		for {
-			<-time.After(3 * time.Second)
-			unmutedUsers, err := mute.ExpireMutes(bot, sqlClient)
-			if err != nil {
-				fmt.Println("err:", err)
-			}
-
-			// Report unmutes in moderation-actions channel
-			for _, unmutedUser := range unmutedUsers {
-				member, err := bot.GuildMember(unmutedUser.GuildID, unmutedUser.UserID)
-				if err != nil {
-					fmt.Println("Error getting guild member:", err)
-					continue
-				}
-				resultMessage := fmt.Sprintf(resultFormat, member.Mention(), unmutedUser.Reason)
-				targetChannel := serverconfig.Get(unmutedUser.GuildID, "channel:moderation-action")
-				if targetChannel == "" {
-					fmt.Println("No channel set up for moderation actions")
-					break
-				}
-				bot.ChannelMessageSend(targetChannel, resultMessage)
-			}
-		}
-	}()
-
-	startCleanUpAttachments(ctx)
+	// Run queued up actions (e.g. unmute user)
+	go startActionRunner(ctx, bot)
+	// Run queued up unmutes
+	go startUnmuterRunner(ctx, bot)
+	// Clean up attachments occasionally
+	go startCleanUpAttachments(ctx)
 
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 }
 
@@ -236,6 +147,12 @@ func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Ignore messages from bots
 	if m.Message.Author.Bot {
 		return
+	}
+
+	// Remove nitro colors if the user doesn't have nitro
+	if hasAccess, _ := utils.MemberInRoles(s, m.GuildID, m.Author.ID, "nitrobooster"); !hasAccess {
+		colorRoles := utils.ColorRoles(s, m.GuildID)
+		utils.RemoveNitroColors(s, m.GuildID, m.Author.ID, colorRoles)
 	}
 
 	if inviteCode, ok := utils.ResolveInviteCode(m.Message.Content); ok && inviteCode != "forsen" {
@@ -457,54 +374,6 @@ func onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) {
 			return
 		}
 	}
-}
-
-func cleanUpAttachments() {
-	// attachmentsMutex.Lock()
-	// for i, a := range attachments {
-	// 	// TODO: delete old attachments
-	// }
-	// attachmentsMutex.Unlock()
-
-	fmt.Println("clean up attachments")
-	attachmentsFolder := filepath.Join("attachments", "*")
-	files, err := filepath.Glob(attachmentsFolder)
-	if err != nil {
-		fmt.Println("ERROR CLEANING UP ATTACHMENTS:", err)
-		return
-	}
-	for _, path := range files {
-		fi, err := os.Stat(path)
-		if err != nil {
-			fmt.Println("Error stating file:", path)
-			continue
-		}
-
-		if time.Now().After(fi.ModTime().Add(timeToKeepLocalAttachments)) {
-			fmt.Println("Deleting attachment", path)
-			err := os.Remove(path)
-			if err != nil {
-				fmt.Println("Error deleting attachment", path, ":", err)
-				continue
-			}
-		}
-	}
-}
-
-func startCleanUpAttachments(ctx context.Context) {
-	go func() {
-		cleanUpAttachments()
-		ticker := time.NewTicker(timeBetweenAttachmentCleanups)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				cleanUpAttachments()
-			}
-		}
-	}()
 }
 
 type localAttachment struct {
