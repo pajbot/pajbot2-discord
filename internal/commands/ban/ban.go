@@ -62,9 +62,9 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		return
 	}
 
-	var isAnonBan = commandName == "$anonban"
+	isAnonBan := commandName == "$anonban"
 
-	var resultMessage = ""
+	resultMessage := ""
 	if isAnonBan {
 		const resultFormat = "Banning %s for reason: %s"
 		resultMessage = fmt.Sprintf(resultFormat, utils.MentionUser(s, m.GuildID, target), utils.EscapeMarkdown(reason))

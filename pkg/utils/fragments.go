@@ -18,7 +18,7 @@ func MentionMember(member *discordgo.Member) string {
 	// user is member of guild. We can mention them with <@!ID> to display their nickname,
 	// and we can retrieve their guild-specific nickname to display
 
-	var nickOrName = member.Nick
+	nickOrName := member.Nick
 	if nickOrName == "" { // no nickname, use their username
 		nickOrName = member.User.Username
 	}
