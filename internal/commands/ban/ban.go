@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	commands.Register([]string{"$ban"}, New())
+	commands.Register([]string{"$ban", "$anonban"}, New())
 }
 
 type Command struct {
@@ -39,15 +39,18 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		return pkg.CommandResultUserCooldown
 	}
 
+	// $ban or $anonban
+	commandName := parts[0]
+
 	if len(m.Mentions) == 0 {
-		s.ChannelMessageSend(m.ChannelID, "missing user arg. usage: $ban <user> <reason>")
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("missing user arg. usage: %s <user> <reason>", commandName))
 		return
 	}
 
 	target := m.Mentions[0]
 
 	if len(parts) < 3 {
-		s.ChannelMessageSend(m.ChannelID, "missing reason arg. usage: $ban <user> <reason>")
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("missing reason arg. usage: %s <user> <reason>", commandName))
 		return
 	}
 
@@ -59,8 +62,16 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		return
 	}
 
-	const resultFormat = "Banning %s (%s) for reason: `%s`"
-	resultMessage := fmt.Sprintf(resultFormat, target.Username, target.ID, reason)
+	var isAnonBan = commandName == "$anonban"
+
+	var resultMessage = ""
+	if isAnonBan {
+		const resultFormat = "Banning %s for reason: %s"
+		resultMessage = fmt.Sprintf(resultFormat, utils.MentionUser(s, m.GuildID, target), utils.EscapeMarkdown(reason))
+	} else {
+		const resultFormat = "%s banned %s for reason: %s"
+		resultMessage = fmt.Sprintf(resultFormat, m.Author.Mention(), utils.MentionUser(s, m.GuildID, target), utils.EscapeMarkdown(reason))
+	}
 
 	s.ChannelMessageSend(m.ChannelID, resultMessage)
 	s.ChannelMessageSend(targetChannel, resultMessage)
