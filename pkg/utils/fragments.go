@@ -27,12 +27,16 @@ func MentionMember(member *discordgo.Member) string {
 	return fmt.Sprintf("%s (%s#%s - %s)", member.Mention(), EscapeMarkdown(nickOrName), member.User.Discriminator, member.User.ID)
 }
 
-func MentionUser(s *discordgo.Session, guildID string, user *discordgo.User) string {
-	var member, err = s.GuildMember(guildID, user.ID)
+func MentionUserFromParts(s *discordgo.Session, guildID string, userID string, userName string, userDiscriminator string) string {
+	member, err := s.GuildMember(guildID, userID)
 	if err == nil {
 		return MentionMember(member)
 	}
 
 	// user is not member of the guild, fall back to more basic information
-	return fmt.Sprintf("%s (%s#%s - %s)", user.Mention(), user.Username, user.Discriminator, user.ID)
+	return fmt.Sprintf("<@!%s> (%s#%s - %s)", userID, userName, userDiscriminator, userID)
+}
+
+func MentionUser(s *discordgo.Session, guildID string, user *discordgo.User) string {
+	return MentionUserFromParts(s, guildID, user.ID, user.Username, user.Discriminator)
 }

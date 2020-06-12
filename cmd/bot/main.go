@@ -514,7 +514,7 @@ func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
 		return
 	}
 
-	s.ChannelMessageSend(targetChannel, fmt.Sprintf("%s was banned by %s: %s", m.User.Mention(), banner.Username, entry.Reason))
+	s.ChannelMessageSend(targetChannel, fmt.Sprintf("%s banned %s for reason: %s", utils.MentionUserFromParts(s, m.GuildID, banner.ID, banner.Username, banner.Discriminator), utils.MentionUser(s, m.GuildID, m.User), utils.EscapeMarkdown(entry.Reason)))
 }
 
 // const weebMessageID = `552788256333234176`
