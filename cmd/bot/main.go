@@ -502,13 +502,19 @@ func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
 	fmt.Println("Entry User ID:", entry.UserID)
 	fmt.Println("target user ID:", m.User.ID)
 
+	botUser, err := s.User("@me")
+	if err != nil && banner.ID == botUser.ID {
+		fmt.Println("Ban is initiated by the bot, will not log into moderator actions channel")
+		return
+	}
+
 	targetChannel := serverconfig.Get(m.GuildID, "channel:moderation-action")
 	if targetChannel == "" {
 		fmt.Println("No channel set up for moderation actions")
 		return
 	}
 
-	s.ChannelMessageSend(targetChannel, fmt.Sprintf("%s was banned by %s: %s", m.User.Mention(), banner.Username, entry.Reason))
+	s.ChannelMessageSend(targetChannel, fmt.Sprintf("%s banned %s for reason: %s", utils.MentionUserFromParts(s, m.GuildID, banner.ID, banner.Username, banner.Discriminator), utils.MentionUser(s, m.GuildID, m.User), utils.EscapeMarkdown(entry.Reason)))
 }
 
 // const weebMessageID = `552788256333234176`

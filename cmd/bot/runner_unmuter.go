@@ -8,6 +8,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/pajbot2-discord/internal/mute"
 	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
+	"github.com/pajbot/pajbot2-discord/pkg/utils"
 )
 
 func startUnmuterRunner(ctx context.Context, bot *discordgo.Session) {
@@ -33,7 +34,7 @@ func startUnmuterRunner(ctx context.Context, bot *discordgo.Session) {
 					fmt.Println("Error getting guild member:", err)
 					continue
 				}
-				resultMessage := fmt.Sprintf(resultFormat, member.Mention(), unmutedUser.Reason)
+				resultMessage := fmt.Sprintf(resultFormat, utils.MentionMember(member), utils.EscapeMarkdown(unmutedUser.Reason))
 				targetChannel := serverconfig.Get(unmutedUser.GuildID, "channel:moderation-action")
 				if targetChannel == "" {
 					fmt.Println("No channel set up for moderation actions")
