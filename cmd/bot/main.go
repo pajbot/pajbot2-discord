@@ -503,7 +503,7 @@ func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
 	fmt.Println("target user ID:", m.User.ID)
 
 	botUser, err := s.User("@me")
-	if err != nil && banner.ID == botUser.ID {
+	if err == nil && banner.ID == botUser.ID {
 		fmt.Println("Ban is initiated by the bot, will not log into moderator actions channel")
 		return
 	}
