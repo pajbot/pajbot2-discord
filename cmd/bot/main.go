@@ -475,7 +475,7 @@ func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
 	go func() {
 		time.Sleep(5 * time.Second)
 
-		auditLog, err := s.GuildAuditLog(m.GuildID, "", "", discordgo.AuditLogActionMemberBanAdd, 50)
+		auditLog, err := s.GuildAuditLog(m.GuildID, "", "", int(discordgo.AuditLogActionMemberBanAdd), 50)
 		if err != nil {
 			fmt.Println("Error getting user ban data", err)
 			return
