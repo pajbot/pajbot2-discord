@@ -472,49 +472,45 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 }
 
 func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
-	auditLog, err := s.GuildAuditLog(m.GuildID, "", "", 22, 1)
-	if err != nil {
-		fmt.Println("Error getting user ban data", err)
-		return
-	}
-	fmt.Println(auditLog)
-	if len(auditLog.AuditLogEntries) != 1 {
-		fmt.Println("Unable to get the single ban entry")
-		return
-	}
-	if len(auditLog.Users) != 2 {
-		fmt.Println("length of users is wrong")
-		return
-	}
-	banner := auditLog.Users[0]
-	bannedUser := auditLog.Users[1]
-	if bannedUser.ID != m.User.ID {
-		fmt.Println("got log for wrong use Pepega")
-		return
-	}
-	fmt.Println(auditLog.Users)
-	entry := auditLog.AuditLogEntries[0]
-	// var username string
-	// for _ user := range auditLog.Users {
-	// 	if user.ID == entry.
-	// }
-	fmt.Println(entry)
-	fmt.Println("Entry User ID:", entry.UserID)
-	fmt.Println("target user ID:", m.User.ID)
+	go func() {
+		time.Sleep(5 * time.Second)
 
-	botUser, err := s.User("@me")
-	if err == nil && banner.ID == botUser.ID {
-		fmt.Println("Ban is initiated by the bot, will not log into moderator actions channel")
-		return
-	}
+		auditLog, err := s.GuildAuditLog(m.GuildID, "", "", discordgo.AuditLogActionMemberBanAdd, 50)
+		if err != nil {
+			fmt.Println("Error getting user ban data", err)
+			return
+		}
+		for _, entry := range auditLog.AuditLogEntries {
+			if entry.TargetID != m.User.ID {
+				continue
+			}
 
-	targetChannel := serverconfig.Get(m.GuildID, "channel:moderation-action")
-	if targetChannel == "" {
-		fmt.Println("No channel set up for moderation actions")
-		return
-	}
+			// Found ban for user, hope this is the right one xD
 
-	s.ChannelMessageSend(targetChannel, fmt.Sprintf("%s banned %s for reason: %s", utils.MentionUserFromParts(s, m.GuildID, banner.ID, banner.Username, banner.Discriminator), utils.MentionUser(s, m.GuildID, m.User), utils.EscapeMarkdown(entry.Reason)))
+			banner, err := s.User(entry.UserID)
+			if err != nil {
+				fmt.Println("Error getting member state for banner:", err)
+				return
+			}
+			botUser, err := s.User("@me")
+			if err == nil && banner.ID == botUser.ID {
+				fmt.Println("Ban is initiated by the bot, will not log into moderator actions channel")
+				return
+			}
+
+			targetChannel := serverconfig.Get(m.GuildID, "channel:moderation-action")
+			if targetChannel == "" {
+				fmt.Println("No channel set up for moderation actions")
+				return
+			}
+
+			s.ChannelMessageSend(targetChannel, fmt.Sprintf("%s banned %s for reason: %s", utils.MentionUserFromParts(s, m.GuildID, banner.ID, banner.Username, banner.Discriminator), utils.MentionUser(s, m.GuildID, m.User), utils.EscapeMarkdown(entry.Reason)))
+
+			return
+		}
+
+		fmt.Println("Unable to find log for banned user Pepega")
+	}()
 }
 
 // const weebMessageID = `552788256333234176`
