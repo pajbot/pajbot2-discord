@@ -70,7 +70,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		resultMessage = fmt.Sprintf(resultFormat, utils.MentionUser(s, m.GuildID, target), reason)
 	} else {
 		const resultFormat = "%s banned %s for reason: %s"
-		resultMessage = fmt.Sprintf(resultFormat, m.Author.Mention(), utils.MentionUser(s, m.GuildID, target), reason)
+		resultMessage = fmt.Sprintf(resultFormat, utils.MentionUser(s, m.GuildID, m.Author), utils.MentionUser(s, m.GuildID, target), reason)
 	}
 
 	s.ChannelMessageSend(m.ChannelID, resultMessage)

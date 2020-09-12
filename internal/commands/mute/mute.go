@@ -101,7 +101,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 
 	// TODO: result message should be different if mute was updated instead of inserted
 	const resultFormat = "%s muted %s for %s. reason: %s"
-	resultMessage := fmt.Sprintf(resultFormat, m.Author.Mention(), utils.MentionUser(s, m.GuildID, target), duration, reason)
+	resultMessage := fmt.Sprintf(resultFormat, utils.MentionUser(s, m.GuildID, m.Author), utils.MentionUser(s, m.GuildID, target), duration, reason)
 
 	// Announce mute success in channel
 	s.ChannelMessageSend(m.ChannelID, resultMessage)
