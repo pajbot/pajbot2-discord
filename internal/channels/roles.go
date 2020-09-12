@@ -5,6 +5,7 @@ var (
 		"action-log":        true,
 		"moderation-action": true,
 		"weeb-channel":      true,
+		"system-messages":   true,
 	}
 )
 

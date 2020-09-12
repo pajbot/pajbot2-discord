@@ -23,6 +23,7 @@ import (
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
 	"github.com/pajbot/pajbot2-discord/pkg/utils"
+	sharedutils "github.com/pajbot/utils"
 	"github.com/pajlada/stupidmigration"
 
 	_ "github.com/lib/pq"
@@ -89,10 +90,16 @@ func main() {
 		return
 	}
 
+	intent := discordgo.IntentsAllWithoutPrivileged | discordgo.IntentsGuildMembers
+
+	bot.Identify.Intents = &intent
+
 	bot.AddHandler(onMessage)
 	bot.AddHandler(onMessageDeleted)
 	bot.AddHandler(onMessageEdited)
 	bot.AddHandler(onUserBanned)
+	bot.AddHandler(onUserJoined)
+	bot.AddHandler(onUserLeft)
 	bot.AddHandler(onMessageReactionAdded)
 	bot.AddHandler(onMessageReactionRemoved)
 	bot.AddHandler(func(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
@@ -511,6 +518,47 @@ func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
 
 		fmt.Println("Unable to find log for banned user Pepega")
 	}()
+}
+
+func postUserInfo(s *discordgo.Session, member *discordgo.Member, title string) {
+	embed := &discordgo.MessageEmbed{
+		Title: title,
+	}
+	targetChannel := serverconfig.Get(member.GuildID, "channel:system-messages")
+	if targetChannel == "" {
+		fmt.Println("No channel set up for system messages")
+		return
+	}
+
+	accountCreationDate, err := discordgo.SnowflakeTimestamp(member.User.ID)
+	if err != nil {
+		fmt.Println("error getting user created date:", err)
+		return
+	}
+
+	embed.Thumbnail = &discordgo.MessageEmbedThumbnail{
+		URL:    member.User.AvatarURL("64x64"),
+		Width:  64,
+		Height: 64,
+	}
+
+	payload := utils.MentionMember(member)
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Name", Value: payload})
+	payload = fmt.Sprintf("%s (%s ago)", accountCreationDate.Format("2006-01-02 15:04:05"), sharedutils.TimeSince(accountCreationDate))
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Account Created", Value: payload})
+
+	_, err = s.ChannelMessageSendEmbed(targetChannel, embed)
+	if err != nil {
+		fmt.Println("Error sending message embed:", err)
+	}
+}
+
+func onUserJoined(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
+	postUserInfo(s, m.Member, "User Joined")
+}
+
+func onUserLeft(s *discordgo.Session, m *discordgo.GuildMemberRemove) {
+	postUserInfo(s, m.Member, "User Left")
 }
 
 // const weebMessageID = `552788256333234176`
