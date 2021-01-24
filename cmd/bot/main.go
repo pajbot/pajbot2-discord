@@ -18,12 +18,14 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/pajbot2-discord/internal/autoreact"
 	"github.com/pajbot/pajbot2-discord/internal/config"
+	"github.com/pajbot/pajbot2-discord/internal/filter"
 	"github.com/pajbot/pajbot2-discord/internal/mute"
 	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
 	"github.com/pajbot/pajbot2-discord/pkg/utils"
 	sharedutils "github.com/pajbot/utils"
+	normalize "github.com/pajlada/lidl-normalize"
 	"github.com/pajlada/stupidmigration"
 
 	_ "github.com/lib/pq"
@@ -82,6 +84,12 @@ func init() {
 	serverconfig.Load(sqlClient)
 }
 
+type App struct {
+	bot *discordgo.Session
+
+	filterRunner *filter.Runner
+}
+
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -93,9 +101,67 @@ func main() {
 
 	bot.Identify.Intents = discordgo.IntentsAllWithoutPrivileged | discordgo.IntentsGuildMembers
 
-	bot.AddHandler(onMessage)
+	var app App
+
+	app.bot = bot
+	app.filterRunner = filter.NewRunner()
+
+	// app.filterRunner.Dry = true
+
+	app.filterRunner.AddFilter(&filter.Delete{
+		Checker: func(content string) bool {
+			requiredParts := []string{"ethereum", "airdrop", "claim"}
+
+			postNormalize, err := normalize.Normalize(content)
+			if err != nil {
+				fmt.Println("Error normalizing message:", content)
+				return false
+			}
+
+			postNormalize = strings.ToLower(postNormalize)
+
+			for _, p := range requiredParts {
+				if !strings.Contains(postNormalize, p) {
+					return false
+				}
+			}
+
+			fmt.Println("The message", content, "post normalize:", postNormalize, "contained all bad parts. delete message!!")
+
+			return true
+		},
+	})
+
+	app.filterRunner.OnDelete(func(message filter.Message) {
+		fmt.Println("delete message...")
+		if err := bot.ChannelMessageDelete(message.DiscordMessage.ChannelID, message.DiscordMessage.ID); err != nil {
+			fmt.Println("Error deleting message:", err)
+		}
+
+		// TODO: include which action it matched
+		app.postToActionLog(message.DiscordMessage.GuildID, "Deleting message because it matched a filter",
+			[]*discordgo.MessageEmbedField{
+				{
+					Name:   "Message",
+					Value:  message.DiscordMessage.Content,
+					Inline: false,
+				},
+			})
+	})
+	app.filterRunner.OnMute(func(message filter.Message) {
+		fmt.Println("mute user...")
+	})
+	app.filterRunner.OnBan(func(message filter.Message) {
+		fmt.Println("ban user...")
+	})
+
+	// app.filterRunner.OnDelete(...)
+	// app.filterRunner.OnBan(...)
+	// app.filterRunner.OnMute(...)
+
+	bot.AddHandler(app.onMessage)
 	bot.AddHandler(onMessageDeleted)
-	bot.AddHandler(onMessageEdited)
+	bot.AddHandler(app.onMessageEdited)
 	bot.AddHandler(onUserBanned)
 	bot.AddHandler(onUserJoined)
 	bot.AddHandler(onUserLeft)
@@ -120,6 +186,8 @@ func main() {
 	go startUnmuterRunner(ctx, bot)
 	// Clean up attachments occasionally
 	go startCleanUpAttachments(ctx)
+
+	go app.filterRunner.Run(ctx)
 
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
@@ -149,7 +217,22 @@ var attachmentsMutex = sync.Mutex{}
 
 const noInvites = true
 
-func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
+func (a *App) postToActionLog(guildID, title string, fields []*discordgo.MessageEmbedField) {
+	targetChannel := serverconfig.Get(guildID, "channel:action-log")
+	if targetChannel == "" {
+		fmt.Println("No channel set up for action log")
+		return
+	}
+
+	embed := &discordgo.MessageEmbed{
+		Title:  title,
+		Fields: fields,
+	}
+
+	a.bot.ChannelMessageSendEmbed(targetChannel, embed)
+}
+
+func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Ignore messages from bots
 	if m.Message.Author.Bot {
 		return
@@ -250,6 +333,10 @@ func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
+	a.filterRunner.ScanMessage(filter.Message{
+		DiscordMessage: m.Message,
+	})
+
 	c, parts := commands.Match(m.Content)
 	if c != nil {
 		if cmd, ok := c.(pkg.Command); ok {
@@ -273,7 +360,7 @@ func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
-func onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) {
+func (a *App) onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) {
 	messageContent, authorID, err := getMessageFromDatabase(m.ID)
 	if err != nil {
 		fmt.Println("on message edit: Error getting full message")
@@ -380,6 +467,9 @@ func onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) {
 			return
 		}
 	}
+	a.filterRunner.ScanMessage(filter.Message{
+		DiscordMessage: m.Message,
+	})
 }
 
 type localAttachment struct {
