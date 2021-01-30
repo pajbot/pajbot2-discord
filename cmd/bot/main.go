@@ -90,9 +90,7 @@ func main() {
 		return
 	}
 
-	intent := discordgo.IntentsAllWithoutPrivileged | discordgo.IntentsGuildMembers
-
-	bot.Identify.Intents = &intent
+	bot.Identify.Intents = discordgo.IntentsAllWithoutPrivileged | discordgo.IntentsGuildMembers
 
 	bot.AddHandler(onMessage)
 	bot.AddHandler(onMessageDeleted)
