@@ -577,9 +577,9 @@ func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAd
 				fmt.Println("err:", err)
 				return
 			}
-			var overwriteDenies int
+			var overwriteDenies int64
 			for _, overwrite := range c.PermissionOverwrites {
-				if overwrite.Type == "member" && overwrite.ID == m.UserID {
+				if overwrite.Type == discordgo.PermissionOverwriteTypeMember && overwrite.ID == m.UserID {
 					overwriteDenies = overwrite.Deny
 				}
 			}
@@ -588,7 +588,7 @@ func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAd
 				return
 			}
 
-			err = s.ChannelPermissionSet(targetChannel, m.UserID, "member", 0, discordgo.PermissionReadMessages)
+			err = s.ChannelPermissionSet(targetChannel, m.UserID, discordgo.PermissionOverwriteTypeMember, 0, discordgo.PermissionReadMessages)
 			if err != nil {
 				fmt.Println("uh oh something went wrong")
 				return
@@ -613,9 +613,9 @@ func onMessageReactionRemoved(s *discordgo.Session, m *discordgo.MessageReaction
 				fmt.Println("err:", err)
 				return
 			}
-			var overwriteDenies int
+			var overwriteDenies int64
 			for _, overwrite := range c.PermissionOverwrites {
-				if overwrite.Type == "member" && overwrite.ID == m.UserID {
+				if overwrite.Type == discordgo.PermissionOverwriteTypeMember && overwrite.ID == m.UserID {
 					overwriteDenies = overwrite.Deny
 				}
 			}
