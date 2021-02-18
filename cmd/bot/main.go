@@ -588,7 +588,7 @@ func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAd
 				return
 			}
 
-			err = s.ChannelPermissionSet(targetChannel, m.UserID, discordgo.PermissionOverwriteTypeMember, 0, discordgo.PermissionReadMessages)
+			err = s.ChannelPermissionSet(targetChannel, m.UserID, discordgo.PermissionOverwriteTypeMember, 0, discordgo.PermissionViewChannel)
 			if err != nil {
 				fmt.Println("uh oh something went wrong")
 				return
@@ -620,7 +620,7 @@ func onMessageReactionRemoved(s *discordgo.Session, m *discordgo.MessageReaction
 				}
 			}
 
-			if overwriteDenies != discordgo.PermissionReadMessages {
+			if overwriteDenies != discordgo.PermissionViewChannel {
 				// s.ChannelMessageSend(m.ChannelID, "not allowed to remove that permission buddy")
 				return
 			}
