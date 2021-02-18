@@ -1,7 +1,13 @@
-name: Go
-on: [push, pull_request]
-jobs:
+---
+name: Build
 
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
