@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/pajbot/pajbot2-discord/internal/roles"
 )
 
-// MemberAdmin returns true if the given user id is an admin
+// MemberAdmin returns true if the given user has the Administrator permission, is the server owner, or has the role that's been tagged as "admin"
 func MemberAdmin(s *discordgo.Session, guildID, userID string) (bool, error) {
 	member, err := s.State.Member(guildID, userID)
 	if err != nil {
@@ -71,6 +72,30 @@ func MemberInRoles(s *discordgo.Session, guildID, userID, role string) (bool, er
 	}
 
 	return false, nil
+}
+
+// MemberHasPermission returns true if the user is in the given role (meaning they have permisison to access/use whatever they are trying to access), or if the user is an administrator (meaning they should always have access to everything)
+func MemberHasPermission(s *discordgo.Session, guildID, userID, role string) (bool, error) {
+	var err error
+	isAdmin, adminErr := MemberAdmin(s, guildID, userID)
+	if isAdmin {
+		return true, nil
+	}
+
+	if adminErr != nil {
+		err = fmt.Errorf("error checking admin status: %w", adminErr)
+	}
+
+	isInRole, roleErr := MemberInRoles(s, guildID, userID, role)
+	if isInRole {
+		return true, nil
+	}
+
+	if roleErr != nil {
+		err = fmt.Errorf("error checking role status: %w", roleErr)
+	}
+
+	return false, err
 }
 
 // GetChannelTypeName returns a readable name for a discordgo.ChannelType

@@ -124,9 +124,7 @@ func (c *Command) configureAutoReact(s *discordgo.Session, m *discordgo.MessageC
 func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) (res pkg.CommandResult) {
 	const usage = "usage: $configure TYPE KEY VALUE"
 	res = pkg.CommandResultNoCooldown
-	fmt.Println("a")
 	hasAccess, err := utils.MemberAdmin(s, m.GuildID, m.Author.ID)
-	fmt.Println("b")
 	if err != nil {
 		fmt.Println("Error checking perms:", err)
 		return pkg.CommandResultUserCooldown
