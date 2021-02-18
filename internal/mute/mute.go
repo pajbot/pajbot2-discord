@@ -118,7 +118,7 @@ func ReapplyMute(s *discordgo.Session, sqlClient *sql.DB, m *discordgo.GuildMemb
 	if muted {
 		mutedRole := roles.GetSingle(m.GuildID, "muted")
 		if mutedRole == "" {
-			return errors.New("No muted role set up")
+			return errors.New("no muted role set up")
 		}
 
 		// Reapply muted role
