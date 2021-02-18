@@ -46,7 +46,7 @@ func MemberAdmin(s *discordgo.Session, guildID, userID string) (bool, error) {
 func MemberInRoles(s *discordgo.Session, guildID, userID, role string) (bool, error) {
 	roles := roles.Get(guildID, role)
 	if len(roles) == 0 {
-		return false, errors.New("No roles set up")
+		return false, errors.New("no roles set up")
 	}
 
 	member, err := s.State.Member(guildID, userID)
