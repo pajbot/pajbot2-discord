@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	commands.Register([]string{"$color"}, New())
+	commands.Register([]string{"$color", "$colour"}, New())
 }
 
 var _ pkg.Command = &Command{}
