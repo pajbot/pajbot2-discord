@@ -138,7 +138,14 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		return pkg.CommandResultUserCooldown
 	}
 
+	// Cut off trigger
 	parts = parts[1:]
+
+	if len(parts) == 0 {
+		const usage = "usage: $configure autoreact/twitter/channel/role ..."
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%s, %s", m.Author.Mention(), usage))
+		return
+	}
 
 	var configType, key, value string
 	configType = parts[0]
