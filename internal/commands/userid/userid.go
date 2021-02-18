@@ -28,7 +28,7 @@ func New() *Command {
 
 func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) (res pkg.CommandResult) {
 	// FIXME
-	hasAccess, err := utils.MemberInRoles(s, m.GuildID, m.Author.ID, "minimod")
+	hasAccess, err := utils.MemberHasPermission(s, m.GuildID, m.Author.ID, "minimod")
 	if err != nil {
 		fmt.Println("Error:", err)
 		return pkg.CommandResultUserCooldown
