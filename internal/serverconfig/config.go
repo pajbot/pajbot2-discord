@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-
-	"github.com/pajbot/pajbot2-discord/pkg/commands"
 )
 
 var (
@@ -67,8 +65,11 @@ func Load(sqlClient *sql.DB) {
 
 // Save sets a value in the database, and then updates the internal store
 func Save(sqlClient *sql.DB, serverID, key, value string) (err error) {
+	if sqlClient == nil {
+		return ErrNoSQLClient
+	}
 	const query = "INSERT INTO config (server_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (server_id, key) DO UPDATE SET value=$3"
-	_, err = commands.SQLClient.Exec(query, serverID, key, value)
+	_, err = sqlClient.Exec(query, serverID, key, value)
 	if err != nil {
 		return
 	}
@@ -81,8 +82,11 @@ func Save(sqlClient *sql.DB, serverID, key, value string) (err error) {
 
 // Remove a value from the database, also removing it from the internal store
 func Remove(sqlClient *sql.DB, serverID, key string) (err error) {
+	if sqlClient == nil {
+		return ErrNoSQLClient
+	}
 	const query = "DELETE FROM config WHERE server_id=$1 AND key=$2"
-	_, err = commands.SQLClient.Exec(query, serverID, key)
+	_, err = sqlClient.Exec(query, serverID, key)
 	if err != nil {
 		return
 	}
