@@ -17,7 +17,7 @@ import (
 )
 
 func init() {
-	commands.Register([]string{"$configure"}, New())
+	commands.Register([]string{"$configure", "$config", "$cfg"}, New())
 }
 
 type Command struct {
