@@ -108,8 +108,14 @@ func (c *Command) configureValue(s *discordgo.Session, m *discordgo.MessageCreat
 			return
 		}
 
-		const f = "%s, key %s reset. old value was %s"
-		r := fmt.Sprintf(f, m.Author.Mention(), key, oldValue)
+		var r string
+		if oldValue == "" {
+			const f = "%s, key %s reset"
+			r = fmt.Sprintf(f, m.Author.Mention(), key)
+		} else {
+			const f = "%s, key %s reset. old value was %s"
+			r = fmt.Sprintf(f, m.Author.Mention(), key, oldValue)
+		}
 		s.ChannelMessageSend(m.ChannelID, r)
 
 		return
@@ -149,8 +155,14 @@ func (c *Command) configureValue(s *discordgo.Session, m *discordgo.MessageCreat
 			return
 		}
 
-		const f = "%s, new value for key %s is %s (old value was %s)"
-		r := fmt.Sprintf(f, m.Author.Mention(), key, value, oldValue)
+		var r string
+		if oldValue == "" {
+			const f = "%s, new value for key %s is %s"
+			r = fmt.Sprintf(f, m.Author.Mention(), key, value)
+		} else {
+			const f = "%s, new value for key %s is %s (old value was %s)"
+			r = fmt.Sprintf(f, m.Author.Mention(), key, value, oldValue)
+		}
 		s.ChannelMessageSend(m.ChannelID, r)
 
 		return
