@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	commands.Register([]string{"$accountage"}, New())
+	commands.Register([]string{"$accountage", "$accage", "$age"}, New())
 }
 
 var _ pkg.Command = &Command{}
