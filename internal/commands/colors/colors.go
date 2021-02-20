@@ -41,7 +41,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		return
 	}
 
-	s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("These are available colors: %s", roleNames))
+	s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("These are the available colors: %s", roleNames))
 	return pkg.CommandResultUserCooldown
 }
 
