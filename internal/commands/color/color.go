@@ -53,7 +53,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	}
 
 	if len(parts) < 2 {
-		s.ChannelMessageSend(m.ChannelID, "You need to provide a color. usage: "+usage)
+		s.ChannelMessageSend(m.ChannelID, "You need to provide a color. Usage: "+usage)
 		return
 	}
 

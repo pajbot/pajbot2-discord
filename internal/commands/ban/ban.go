@@ -43,14 +43,14 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	commandName := parts[0]
 
 	if len(m.Mentions) == 0 {
-		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("missing user arg. usage: %s <user> <reason>", commandName))
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Missing user argument. Usage: %s <user> <reason>", commandName))
 		return
 	}
 
 	target := m.Mentions[0]
 
 	if len(parts) < 3 {
-		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("missing reason arg. usage: %s <user> <reason>", commandName))
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Missing reason argument. Usage: %s <user> <reason>", commandName))
 		return
 	}
 
