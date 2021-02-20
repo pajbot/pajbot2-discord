@@ -1,0 +1,13 @@
+[Unit]
+Description=pajbot2-discord
+After=network.target
+
+[Service]
+Type=simple
+User=billy
+ExecStart=/path/to/binary
+RestartSec=5
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

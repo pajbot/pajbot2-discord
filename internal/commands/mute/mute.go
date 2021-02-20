@@ -63,7 +63,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	}
 
 	if len(m.Mentions) == 0 {
-		s.ChannelMessageSend(m.ChannelID, "missing user arg. usage: $mute <user> <time> <reason>")
+		s.ChannelMessageSend(m.ChannelID, "Missing user argument. Usage: $mute <user> <time> <reason>")
 		return
 	}
 

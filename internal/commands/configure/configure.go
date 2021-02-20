@@ -213,7 +213,7 @@ func (c *Command) configureAutoReact(s *discordgo.Session, m *discordgo.MessageC
 		}
 
 		if len(emojiIDs) == 0 {
-			s.ChannelMessageSend(m.ChannelID, "no valid emojis passed to the set function feelsweirdman")
+			s.ChannelMessageSend(m.ChannelID, "no valid emojis passed to the set function 😕")
 			return
 		}
 
