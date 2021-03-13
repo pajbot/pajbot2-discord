@@ -9,7 +9,7 @@ require (
 	github.com/dghubble/go-twitter v0.0.0-20190719072343-39e5462e111f
 	github.com/dghubble/oauth1 v0.7.0
 	github.com/gorilla/websocket v1.4.2 // indirect
-	github.com/lib/pq v1.9.0
+	github.com/lib/pq v1.10.0
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/pajbot/basecommand v1.0.0
 	github.com/pajbot/commandmatcher v1.0.1
