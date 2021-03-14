@@ -16,7 +16,7 @@ func returnActions(ctx context.Context, actions []Action) []Action {
 		return actions
 	}
 
-	if dry, ok := ctx.Value("dry").(bool); ok && dry {
+	if dry, ok := ctx.Value(dryRunFlag).(bool); ok && dry {
 		fmt.Printf("Skipping actions: %#v\n", actions)
 		return nil
 	}

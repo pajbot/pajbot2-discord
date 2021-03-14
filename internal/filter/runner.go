@@ -5,6 +5,12 @@ import (
 	"fmt"
 )
 
+type runnerFlag int
+
+const (
+	dryRunFlag runnerFlag = iota
+)
+
 type Runner struct {
 	messages chan Message
 
@@ -30,7 +36,7 @@ func (r *Runner) AddFilter(f Filter) {
 }
 
 func (r *Runner) Run(ctx context.Context) {
-	r.ctx = context.WithValue(ctx, "dry", r.Dry)
+	r.ctx = context.WithValue(ctx, dryRunFlag, r.Dry)
 
 	for {
 		select {
