@@ -102,6 +102,8 @@ func main() {
 
 	bot.Identify.Intents = discordgo.IntentsAllWithoutPrivileged | discordgo.IntentsGuildMembers
 
+	bot.State.MaxMessageCount = 1000
+
 	var app App
 
 	app.bot = bot
@@ -484,6 +486,10 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 	messageContent, authorID, err := getMessageFromDatabase(m.ID)
 	if err != nil {
 		fmt.Println("on message deleted: Error getting full message")
+		if m.BeforeDelete != nil {
+			messageContent = m.BeforeDelete.Content
+			authorID = m.BeforeDelete.Author.ID
+		}
 	}
 
 	targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
