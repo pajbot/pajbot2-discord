@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
@@ -634,8 +635,33 @@ func postUserInfo(s *discordgo.Session, member *discordgo.Member, title string) 
 	}
 }
 
+func banIfUserIsYoungerThan(s *discordgo.Session, m *discordgo.GuildMemberAdd, minimumAge time.Duration) {
+	accountCreationDate, err := discordgo.SnowflakeTimestamp(m.Member.User.ID)
+	if err != nil {
+		fmt.Println("error getting user created date:", err)
+		return
+	}
+
+	accountAge := time.Now().Sub(accountCreationDate)
+
+	if accountAge < minimumAge {
+		delay := 5 + rand.Intn(26)
+		fmt.Printf("Banning user with id %s in %d seconds\n", m.Member.User.ID, delay)
+
+		go func() {
+			time.Sleep(time.Duration(delay) * time.Second)
+			err := s.GuildBanCreateWithReason(m.GuildID, m.Member.User.ID, "!hide", 1)
+			if err != nil {
+				fmt.Println("Error banning user:", err)
+			}
+		}()
+	}
+}
+
 func onUserJoined(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 	postUserInfo(s, m.Member, "User Joined")
+
+	// banIfUserIsYoungerThan(s, m, 1*time.Hour)
 }
 
 func onUserLeft(s *discordgo.Session, m *discordgo.GuildMemberRemove) {
