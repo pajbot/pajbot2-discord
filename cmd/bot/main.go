@@ -110,6 +110,54 @@ func main() {
 
 	app.filterRunner.AddFilter(&filter.Delete{
 		Checker: func(content string) bool {
+			requiredParts := []string{"larvalabs.net", "cryptopunks", "nft", "tokens"}
+
+			postNormalize, err := normalize.Normalize(content)
+			if err != nil {
+				fmt.Println("Error normalizing message:", content)
+				return false
+			}
+
+			postNormalize = strings.ToLower(postNormalize)
+
+			for _, p := range requiredParts {
+				if !strings.Contains(postNormalize, p) {
+					return false
+				}
+			}
+
+			fmt.Println("The message", content, "post normalize:", postNormalize, "contained all bad parts. delete message!!")
+
+			return true
+		},
+	})
+
+	app.filterRunner.AddFilter(&filter.Delete{
+		Checker: func(content string) bool {
+			requiredParts := []string{"cryptopunks", "wallet", "free"}
+
+			postNormalize, err := normalize.Normalize(content)
+			if err != nil {
+				fmt.Println("Error normalizing message:", content)
+				return false
+			}
+
+			postNormalize = strings.ToLower(postNormalize)
+
+			for _, p := range requiredParts {
+				if !strings.Contains(postNormalize, p) {
+					return false
+				}
+			}
+
+			fmt.Println("The message", content, "post normalize:", postNormalize, "contained all bad parts. delete message!!")
+
+			return true
+		},
+	})
+
+	app.filterRunner.AddFilter(&filter.Delete{
+		Checker: func(content string) bool {
 			requiredParts := []string{"ethereum", "airdrop", "claim"}
 
 			postNormalize, err := normalize.Normalize(content)
@@ -129,6 +177,28 @@ func main() {
 			fmt.Println("The message", content, "post normalize:", postNormalize, "contained all bad parts. delete message!!")
 
 			return true
+		},
+	})
+
+	app.filterRunner.AddFilter(&filter.DeleteAdvanced{
+		Checker: func(message *discordgo.Message) bool {
+			bannedHosts := []string{
+				"tenor.com",
+			}
+			if message.ChannelID != "103642197076742144" {
+				return false
+			}
+
+			for _, embed := range message.Embeds {
+				lowercaseURL := strings.ToLower(embed.URL)
+				for _, bannedHost := range bannedHosts {
+					if strings.Contains(lowercaseURL, bannedHost) {
+						return true
+					}
+				}
+			}
+
+			return false
 		},
 	})
 
