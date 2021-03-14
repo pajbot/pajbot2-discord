@@ -576,7 +576,23 @@ func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
 				return
 			}
 
-			s.ChannelMessageSend(targetChannel, fmt.Sprintf("%s banned %s for reason: %s", utils.MentionUserFromParts(s, m.GuildID, banner.ID, banner.Username, banner.Discriminator), utils.MentionUser(s, m.GuildID, m.User), utils.EscapeMarkdown(entry.Reason)))
+			hidden := strings.Contains(entry.Reason, "!hide") || strings.Contains(entry.Reason, "!hidden")
+
+			anon := strings.Contains(entry.Reason, "!anon")
+
+			var message string
+
+			if anon {
+				message = fmt.Sprintf("%s was banned for reason: %s", utils.MentionUser(s, m.GuildID, m.User), utils.EscapeMarkdown(entry.Reason))
+			} else {
+				message = fmt.Sprintf("%s banned %s for reason: %s", utils.MentionUserFromParts(s, m.GuildID, banner.ID, banner.Username, banner.Discriminator), utils.MentionUser(s, m.GuildID, m.User), utils.EscapeMarkdown(entry.Reason))
+			}
+
+			if hidden {
+				fmt.Println("HIDDEN BAN:", message)
+			} else {
+				s.ChannelMessageSend(targetChannel, message)
+			}
 
 			return
 		}
