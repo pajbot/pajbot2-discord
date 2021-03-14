@@ -642,7 +642,7 @@ func banIfUserIsYoungerThan(s *discordgo.Session, m *discordgo.GuildMemberAdd, m
 		return
 	}
 
-	accountAge := time.Now().Sub(accountCreationDate)
+	accountAge := time.Since(accountCreationDate)
 
 	if accountAge < minimumAge {
 		delay := 5 + rand.Intn(26)
