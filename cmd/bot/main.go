@@ -37,18 +37,19 @@ import (
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/color"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/colors"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/configure"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/eightball"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/guildinfo"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/modcommands"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/mute"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/ping"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/points"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/profile"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/roleinfo"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/roles"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/tags"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/test"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/userid"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/whereisstreamer"
-	_ "github.com/pajbot/pajbot2-discord/internal/commands/eightball"
 )
 
 const (
