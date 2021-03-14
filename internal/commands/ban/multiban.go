@@ -154,9 +154,7 @@ func (c *MultiBan) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts [
 
 	utils.SendChunks(fmt.Sprintf("Users found matching options: Creation Date >= %s && Creation Date <= %s", opts.CreatedFrom, opts.CreatedTo), "", chunks, targetChannel, s)
 
-	resultMessage := fmt.Sprintf("%s", reason)
-
-	s.ChannelMessageSend(m.ChannelID, resultMessage)
+	s.ChannelMessageSend(m.ChannelID, reason)
 	// s.ChannelMessageSend(targetChannel, resultMessage)
 	// s.GuildBanCreateWithReason(m.GuildID, target.ID, reason, 0)
 
