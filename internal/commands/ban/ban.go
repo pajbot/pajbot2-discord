@@ -47,6 +47,8 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		return
 	}
 
+	parts = parts[1:]
+
 	target := m.Mentions[0]
 
 	if len(parts) < 3 {
@@ -54,7 +56,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		return
 	}
 
-	reason := strings.Join(parts[2:], " ")
+	reason := strings.Join(parts[1:], " ")
 
 	targetChannel := serverconfig.Get(m.GuildID, "channel:moderation-action")
 	if targetChannel == "" {
