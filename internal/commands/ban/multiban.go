@@ -40,22 +40,6 @@ const doneEmoji = "✅"
 
 func (c *MultiBan) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) (res pkg.CommandResult) {
 	var opts options
-	defer func() {
-		botUser, err := s.User("@me")
-		if err != nil {
-			fmt.Println("cant get me!")
-			return
-		}
-
-		err = s.MessageReactionRemove(m.ChannelID, m.ID, dankCircle, botUser.ID)
-		if err != nil {
-			fmt.Println("Error removing reaction:", err)
-		}
-		err = s.MessageReactionAdd(m.ChannelID, m.ID, doneEmoji)
-		if err != nil {
-			fmt.Println("Error adding done reaction:", err)
-		}
-	}()
 
 	err := s.MessageReactionAdd(m.ChannelID, m.ID, dankCircle)
 	if err != nil {
@@ -96,6 +80,23 @@ func (c *MultiBan) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts [
 		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%s, error parsing --created-to parameter '%s'. Format must be like this: --created-to='%s': %s", m.Author.Mention(), opts.CreatedTo, layout, err.Error()))
 		return
 	}
+
+	defer func() {
+		botUser, err := s.User("@me")
+		if err != nil {
+			fmt.Println("cant get me!")
+			return
+		}
+
+		err = s.MessageReactionRemove(m.ChannelID, m.ID, dankCircle, botUser.ID)
+		if err != nil {
+			fmt.Println("Error removing reaction:", err)
+		}
+		err = s.MessageReactionAdd(m.ChannelID, m.ID, doneEmoji)
+		if err != nil {
+			fmt.Println("Error adding done reaction:", err)
+		}
+	}()
 
 	reason := strings.Join(args, " ")
 
