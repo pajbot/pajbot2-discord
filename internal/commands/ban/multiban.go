@@ -47,7 +47,7 @@ func (c *MultiBan) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts [
 	}
 
 	res = pkg.CommandResultNoCooldown
-	hasAccess, err := utils.MemberInRoles(s, m.GuildID, m.Author.ID, "mod")
+	hasAccess, err := utils.MemberHasPermission(s, m.GuildID, m.Author.ID, "mod")
 	if err != nil {
 		fmt.Println("Error:", err)
 		return pkg.CommandResultUserCooldown
