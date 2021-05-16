@@ -2,16 +2,17 @@ package utils
 
 import (
 	"fmt"
-	"github.com/bwmarrin/discordgo"
 	"regexp"
+
+	"github.com/bwmarrin/discordgo"
 )
 
 var (
-	markdownRegex = regexp.MustCompile(`[_*~|]{1,2}|\\x60{1,3}`)
+	markdownRegex = regexp.MustCompile(`([\\\x60_*~|])`)
 )
 
 func EscapeMarkdown(s string) string {
-	return markdownRegex.ReplaceAllString(s, "\\\\$0")
+	return markdownRegex.ReplaceAllString(s, `\$1`)
 }
 
 func MentionMember(member *discordgo.Member) string {

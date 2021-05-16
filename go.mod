@@ -8,6 +8,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dghubble/go-twitter v0.0.0-20190719072343-39e5462e111f
 	github.com/dghubble/oauth1 v0.7.0
+	github.com/frankban/quicktest v1.13.0
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/lib/pq v1.10.1
