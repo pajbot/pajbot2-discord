@@ -32,9 +32,9 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	if len(parts) > 2 {
 		parts = parts[1:]
 		response := fmt.Sprintf("%s, %s", m.Author.Mention(), parts[rand.Intn(len(parts))])
-		s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend {
-				Content:         response,
-				AllowedMentions: &discordgo.MessageAllowedMentions{Users: nil},
+		s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
+			Content:         response,
+			AllowedMentions: &discordgo.MessageAllowedMentions{Users: nil},
 		})
 	}
 	return pkg.CommandResultFullCooldown
