@@ -43,6 +43,7 @@ import (
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/modcommands"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/mute"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/ping"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/choice"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/points"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/profile"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/roleinfo"
