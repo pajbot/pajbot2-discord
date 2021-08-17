@@ -20,5 +20,5 @@ require (
 	github.com/stretchr/testify v1.6.1 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200605160147-a5ece683394c // indirect
-	honnef.co/go/tools v0.2.0
+	honnef.co/go/tools v0.2.1
 )
