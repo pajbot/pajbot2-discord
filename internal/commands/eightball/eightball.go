@@ -49,6 +49,11 @@ var replies = []string{
 	"Yes.",
 	"Yes – definitely.",
 	"You may rely on it.",
+	"Absolutely not.",
+	"Not a chance.",
+	"No, I don't think so.",
+	"That's not very likely.",
+	"No way Jose.",
 }
 
 func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) pkg.CommandResult {
