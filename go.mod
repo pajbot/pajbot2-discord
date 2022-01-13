@@ -7,7 +7,7 @@ require (
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dghubble/go-twitter v0.0.0-20190719072343-39e5462e111f
-	github.com/dghubble/oauth1 v0.7.0
+	github.com/dghubble/oauth1 v0.7.1
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/lib/pq v1.10.4
@@ -17,7 +17,6 @@ require (
 	github.com/pajbot/testhelper v1.0.0
 	github.com/pajbot/utils v1.0.0
 	github.com/pajlada/stupidmigration v0.0.0-20190210111805-ed60e42e8f73
-	github.com/stretchr/testify v1.6.1 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200605160147-a5ece683394c // indirect
 	honnef.co/go/tools v0.2.2
