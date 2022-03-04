@@ -3,12 +3,11 @@ module github.com/pajbot/pajbot2-discord
 go 1.12
 
 require (
-	github.com/bwmarrin/discordgo v0.23.2
+	github.com/bwmarrin/discordgo v0.24.0
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dghubble/go-twitter v0.0.0-20190719072343-39e5462e111f
 	github.com/dghubble/oauth1 v0.7.1
-	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/lib/pq v1.10.4
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect

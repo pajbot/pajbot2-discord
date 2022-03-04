@@ -77,12 +77,7 @@ func (c *Command) clear(s *discordgo.Session, m *discordgo.MessageCreate, clearC
 	now := time.Now()
 	oldestMessageLimit := now.Add(-time.Hour * (24 * 14))
 	for _, message := range messages {
-		messageTimestamp, err := message.Timestamp.Parse()
-		if err != nil {
-			fmt.Println("Error getting timestamp for message:", err)
-			continue
-		}
-		if messageTimestamp.Before(oldestMessageLimit) {
+		if message.Timestamp.Before(oldestMessageLimit) {
 			// message too old, skipping it
 			continue
 		}
