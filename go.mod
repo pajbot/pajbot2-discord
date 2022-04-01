@@ -1,6 +1,6 @@
 module github.com/pajbot/pajbot2-discord
 
-go 1.12
+go 1.17
 
 require (
 	github.com/bwmarrin/discordgo v0.24.0
