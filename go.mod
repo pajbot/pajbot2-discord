@@ -7,7 +7,7 @@ require (
 	github.com/dghubble/go-twitter v0.0.0-20190719072343-39e5462e111f
 	github.com/dghubble/oauth1 v0.7.1
 	github.com/jessevdk/go-flags v1.5.0
-	github.com/lib/pq v1.10.4
+	github.com/lib/pq v1.10.5
 	github.com/pajbot/basecommand v1.0.0
 	github.com/pajbot/commandmatcher v1.0.1
 	github.com/pajbot/testhelper v1.0.0
