@@ -3,7 +3,7 @@ module github.com/pajbot/pajbot2-discord
 go 1.17
 
 require (
-	github.com/bwmarrin/discordgo v0.25.0
+	github.com/bwmarrin/discordgo v0.26.0
 	github.com/dghubble/go-twitter v0.0.0-20190719072343-39e5462e111f
 	github.com/dghubble/oauth1 v0.7.1
 	github.com/jessevdk/go-flags v1.5.0
