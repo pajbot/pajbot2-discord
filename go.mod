@@ -13,7 +13,7 @@ require (
 	github.com/pajbot/testhelper v1.0.0
 	github.com/pajbot/utils v1.0.0
 	github.com/pajlada/stupidmigration v0.0.0-20190210111805-ed60e42e8f73
-	honnef.co/go/tools v0.4.1
+	honnef.co/go/tools v0.4.2
 )
 
 require (
