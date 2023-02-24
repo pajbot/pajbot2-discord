@@ -23,9 +23,13 @@ type Command struct {
 }
 
 func New() *Command {
-	return &Command{
+	c := &Command{
 		Command: basecommand.New(),
 	}
+
+	c.UserCooldown = 30
+
+	return c
 }
 
 var replies = []string{
