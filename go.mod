@@ -23,7 +23,6 @@ require (
 	github.com/dghubble/sling v1.4.1 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
-	github.com/pajlada/lidl-normalize v0.0.0-20180520094422-e6eb1186f156 // indirect
 	golang.org/x/crypto v0.6.0 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20221208152030-732eee02a75a // indirect
 	golang.org/x/mod v0.7.0 // indirect
