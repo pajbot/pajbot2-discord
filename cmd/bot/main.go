@@ -26,6 +26,7 @@ import (
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
 	"github.com/pajbot/pajbot2-discord/pkg/utils"
 	sharedutils "github.com/pajbot/utils"
+	normalize "github.com/pajlada/lidl-normalize"
 	"github.com/pajlada/stupidmigration"
 
 	_ "github.com/lib/pq"
@@ -34,6 +35,7 @@ import (
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/ban"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/channelinfo"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/channels"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/choice"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/clear"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/color"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/colors"
@@ -43,7 +45,6 @@ import (
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/modcommands"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/mute"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/ping"
-	_ "github.com/pajbot/pajbot2-discord/internal/commands/choice"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/points"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/profile"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/roleinfo"
@@ -111,6 +112,100 @@ func main() {
 	app.filterRunner = filter.NewRunner()
 
 	// app.filterRunner.Dry = true
+
+	app.filterRunner.AddFilter(&filter.Delete{
+		Checker: func(content string) bool {
+			requiredParts := []string{"larvalabs.net", "cryptopunks", "nft", "tokens"}
+
+			postNormalize, err := normalize.Normalize(content)
+			if err != nil {
+				fmt.Println("Error normalizing message:", content)
+				return false
+			}
+
+			postNormalize = strings.ToLower(postNormalize)
+
+			for _, p := range requiredParts {
+				if !strings.Contains(postNormalize, p) {
+					return false
+				}
+			}
+
+			fmt.Println("The message", content, "post normalize:", postNormalize, "contained all bad parts. delete message!!")
+
+			return true
+		},
+	})
+
+	app.filterRunner.AddFilter(&filter.Delete{
+		Checker: func(content string) bool {
+			requiredParts := []string{"cryptopunks", "wallet", "free"}
+
+			postNormalize, err := normalize.Normalize(content)
+			if err != nil {
+				fmt.Println("Error normalizing message:", content)
+				return false
+			}
+
+			postNormalize = strings.ToLower(postNormalize)
+
+			for _, p := range requiredParts {
+				if !strings.Contains(postNormalize, p) {
+					return false
+				}
+			}
+
+			fmt.Println("The message", content, "post normalize:", postNormalize, "contained all bad parts. delete message!!")
+
+			return true
+		},
+	})
+
+	app.filterRunner.AddFilter(&filter.Delete{
+		Checker: func(content string) bool {
+			requiredParts := []string{"ethereum", "airdrop", "claim"}
+
+			postNormalize, err := normalize.Normalize(content)
+			if err != nil {
+				fmt.Println("Error normalizing message:", content)
+				return false
+			}
+
+			postNormalize = strings.ToLower(postNormalize)
+
+			for _, p := range requiredParts {
+				if !strings.Contains(postNormalize, p) {
+					return false
+				}
+			}
+
+			fmt.Println("The message", content, "post normalize:", postNormalize, "contained all bad parts. delete message!!")
+
+			return true
+		},
+	})
+
+	app.filterRunner.AddFilter(&filter.DeleteAdvanced{
+		Checker: func(message *discordgo.Message) bool {
+			bannedHosts := []string{
+				"tenor.com",
+			}
+			if message.ChannelID != "103642197076742144" {
+				return false
+			}
+
+			for _, embed := range message.Embeds {
+				lowercaseURL := strings.ToLower(embed.URL)
+				for _, bannedHost := range bannedHosts {
+					if strings.Contains(lowercaseURL, bannedHost) {
+						return true
+					}
+				}
+			}
+
+			return false
+		},
+	})
 
 	app.filterRunner.OnDelete(func(message filter.Message) {
 		fmt.Println("delete message...")
@@ -676,7 +771,7 @@ func onUserLeft(s *discordgo.Session, m *discordgo.GuildMemberRemove) {
 }
 
 // const weebMessageID = `552788256333234176`
-const weebMessageID = `552791672854151190`
+const weebMessageID = `889819209507438603`
 const reactionBye = "👋"
 
 func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
