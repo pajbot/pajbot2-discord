@@ -438,7 +438,8 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 func (a *App) onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) {
 	messageContent, authorID, err := getMessageFromDatabase(m.ID)
 	if err != nil {
-		fmt.Println("on message edit: Error getting full message")
+		fmt.Println("on message edit: Error getting full message:", err)
+		return
 	}
 	targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
 	if targetChannel == "" {
@@ -451,7 +452,7 @@ func (a *App) onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) 
 	if authorID != "unknown" {
 		member, err = s.GuildMember(m.GuildID, authorID)
 		if err != nil {
-			fmt.Println("Error getting guild member:", err)
+			fmt.Println("Error getting guild member of edited message:", err)
 		}
 	}
 
