@@ -680,7 +680,7 @@ func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
 				return
 			}
 
-			hidden := strings.Contains(entry.Reason, "!hide") || strings.Contains(entry.Reason, "!hidden")
+			hidden := strings.Contains(entry.Reason, "!hide") || strings.Contains(entry.Reason, "!hidden") || strings.Contains(entry.Reason, "$hide") || strings.Contains(entry.Reason, "$hidden")
 
 			anon := strings.Contains(entry.Reason, "!anon")
 
