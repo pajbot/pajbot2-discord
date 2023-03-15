@@ -14,7 +14,7 @@ require (
 	github.com/pajbot/utils v1.0.0
 	github.com/pajlada/lidl-normalize v0.0.0-20180520094422-e6eb1186f156
 	github.com/pajlada/stupidmigration v0.0.0-20190210111805-ed60e42e8f73
-	honnef.co/go/tools v0.4.2
+	honnef.co/go/tools v0.4.3
 )
 
 require (
