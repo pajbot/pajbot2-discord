@@ -31,9 +31,9 @@ func New() *Command {
 
 func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) pkg.CommandResult {
 	if len(parts) >= 2 {
-		var number, err = strconv.Atoi(parts[1])
+		number, err := strconv.Atoi(parts[1])
 		if err == nil && number >= 1 {
-			var response = discordgo.MessageSend{
+			response := discordgo.MessageSend{
 				Content: fmt.Sprintf("%s, %d", m.Author.Mention(), rand.Intn(number)),
 			}
 			s.ChannelMessageSendComplex(m.ChannelID, &response)
