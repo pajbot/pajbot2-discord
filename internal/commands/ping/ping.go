@@ -36,8 +36,12 @@ var vowels = []rune{
 	'a', 'e', 'i', 'o', 'u',
 }
 
+func GetPingResponse() string {
+	return fmt.Sprintf("p%cng", vowels[rand.Intn(len(vowels))])
+}
+
 func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) pkg.CommandResult {
-	response := fmt.Sprintf("%s, p%cng", m.Author.Mention(), vowels[rand.Intn(len(vowels))])
+	response := fmt.Sprintf("%s, %s", m.Author.Mention(), GetPingResponse())
 	s.ChannelMessageSend(m.ChannelID, response)
 	return pkg.CommandResultFullCooldown
 }

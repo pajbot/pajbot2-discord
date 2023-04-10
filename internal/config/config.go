@@ -13,6 +13,9 @@ var (
 
 	Token string
 
+	// Guild IDs in which to enable all slash commands
+	SlashCommandGuildIDs []string
+
 	// Twitter
 	TwitterConsumerKey       string
 	TwitterConsumerSecret    string
@@ -24,6 +27,8 @@ func init() {
 	DSN = stringEnv(envName("SQL_DSN"), "postgres:///pajbot2_discord?sslmode=disable")
 
 	Token = mustStringEnv(envName("TOKEN"))
+
+	SlashCommandGuildIDs = cleanList(stringListEnv(envName("SLASH_COMMAND_GUILD_IDS"), []string{}))
 
 	// Twitter
 	TwitterConsumerKey = stringEnv(envName("TWITTER_CONSUMER_KEY"), "")

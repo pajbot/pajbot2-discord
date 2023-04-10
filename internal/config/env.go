@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"os"
+	"strings"
+)
 
 func mustStringEnv(key string) string {
 	if value, ok := os.LookupEnv(key); ok {
@@ -13,6 +16,14 @@ func mustStringEnv(key string) string {
 func stringEnv(key string, defaultValue string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value
+	}
+
+	return defaultValue
+}
+
+func stringListEnv(key string, defaultValue []string) []string {
+	if value, ok := os.LookupEnv(key); ok {
+		return strings.Split(value, ",")
 	}
 
 	return defaultValue

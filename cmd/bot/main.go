@@ -22,6 +22,7 @@ import (
 	"github.com/pajbot/pajbot2-discord/internal/filter"
 	"github.com/pajbot/pajbot2-discord/internal/mute"
 	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
+	"github.com/pajbot/pajbot2-discord/internal/slashcommands"
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
 	"github.com/pajbot/pajbot2-discord/pkg/utils"
@@ -256,6 +257,15 @@ func main() {
 
 	defer bot.Close()
 
+	slashcommands := slashcommands.New(config.SlashCommandGuildIDs)
+
+	// Create all slash commands
+	err = slashcommands.Create(bot)
+	if err != nil {
+		fmt.Println("Error creating slash commands:", err)
+		return
+	}
+
 	// Run queued up actions (e.g. unmute user)
 	go startActionRunner(ctx, bot)
 	// Run queued up unmutes
@@ -269,6 +279,13 @@ func main() {
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
+
+	// Delete all registered slash commands
+	err = slashcommands.Delete(bot)
+	if err != nil {
+		fmt.Println("Error creating slash commands:", err)
+		return
+	}
 }
 
 func pushMessageIntoDatabase(m *discordgo.Message) (err error) {
