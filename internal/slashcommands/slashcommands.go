@@ -70,7 +70,7 @@ func (s *SlashCommands) Create(session *discordgo.Session) error {
 		for _, cmd := range commands {
 			registeredCommand, err := session.ApplicationCommandCreate(session.State.User.ID, guildID, cmd.command)
 			if err != nil {
-				return fmt.Errorf("Error creating command %v: %w", cmd, err)
+				return fmt.Errorf("creating command '%s' failed: %w", cmd.name, err)
 			}
 			cmd.registeredCommands = append(cmd.registeredCommands, registeredCommand)
 		}
