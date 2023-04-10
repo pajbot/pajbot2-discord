@@ -1,6 +1,10 @@
 # Changelog
 
-## Unversioned
+## 2023-04-10
+
+- Add basic support for slash commands. (#81)
+
+## Undated
 
 - Minor: Moderator commands now also check for server ownership in addition to moderator role
 - Minor: Add ability to configure various uncategorized values using the `$configure value` command. Use `$configure value keys` to see a list of valid keys and their description. (#46)
