@@ -456,7 +456,7 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 func (a *App) onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) {
 	messageContent, authorID, err := getMessageFromDatabase(m.ID)
 	if err != nil {
-		fmt.Println("on message edit: Error getting full message:", err)
+		fmt.Printf("on message edit: Error getting full message '%s': %s\n", m.ID, err)
 		return
 	}
 	targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
