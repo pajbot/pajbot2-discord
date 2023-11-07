@@ -12,21 +12,21 @@ require (
 	github.com/pajbot/commandmatcher v1.0.1
 	github.com/pajbot/testhelper v1.0.0
 	github.com/pajbot/utils v1.0.0
-	github.com/pajlada/lidl-normalize v0.1.1
+	github.com/pajlada/lidl-normalize v1.0.0
 	github.com/pajlada/stupidmigration v0.1.0
 	honnef.co/go/tools v0.4.6
 )
 
 require (
-	github.com/BurntSushi/toml v1.2.1 // indirect
+	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/dghubble/sling v1.4.1 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	golang.org/x/crypto v0.8.0 // indirect
-	golang.org/x/exp/typeparams v0.0.0-20230321023759-10a507213a29 // indirect
-	golang.org/x/mod v0.12.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
-	golang.org/x/tools v0.12.1-0.20230825192346-2191a27a6dc5 // indirect
+	golang.org/x/exp/typeparams v0.0.0-20231006140011-7918f672742d // indirect
+	golang.org/x/mod v0.14.0 // indirect
+	golang.org/x/sys v0.14.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/tools v0.14.0 // indirect
 )
