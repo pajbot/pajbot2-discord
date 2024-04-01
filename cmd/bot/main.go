@@ -782,6 +782,13 @@ func banIfUserIsYoungerThan(s *discordgo.Session, m *discordgo.GuildMemberAdd, m
 func onUserJoined(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 	postUserInfo(s, m.Member, "User Joined")
 
+	if m.GuildID == forsenServerID {
+		fmt.Printf("Granting members role to %s (%s)\n", m.User.Username, m.User.ID)
+		if err := s.GuildMemberRoleAdd(m.GuildID, m.User.ID, membersRole); err != nil {
+			fmt.Println("Error adding Members role to user:", err)
+		}
+	}
+
 	// banIfUserIsYoungerThan(s, m, 1*time.Hour)
 }
 
@@ -792,6 +799,8 @@ func onUserLeft(s *discordgo.Session, m *discordgo.GuildMemberRemove) {
 // const weebMessageID = `552788256333234176`
 const weebMessageID = `889819209507438603`
 const reactionBye = "👋"
+const membersRole = `825354461102473226`
+const forsenServerID = `97034666673975296`
 
 func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 	targetChannel := serverconfig.Get(m.GuildID, "channel:weeb-channel")
