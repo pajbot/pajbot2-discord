@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -375,6 +376,51 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 
 			// Announce mute in moderation-action channel
+			s.ChannelMessageSendEmbed(targetChannel, embed)
+			return
+		}
+	}
+
+	// Remove messages containing "display links"
+	linkRegex := regexp.MustCompile(`\[(.*?)\]\((https?://\S+)\)`)
+	matches := linkRegex.FindAllStringSubmatch(m.Message.Content, -1)
+	if len(matches) > 0 {
+		hasAccess, err := utils.MemberInRoles(s, m.GuildID, m.Author.ID, "minimod")
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		if !hasAccess {
+			err := s.ChannelMessageDelete(m.Message.ChannelID, m.Message.ID)
+			if err != nil {
+				fmt.Println("Error deleting message")
+			}
+			embed := &discordgo.MessageEmbed{
+				Title: "Message deleted because it contained a link with a different display text",
+			}
+			payload := fmt.Sprintf("<@%s> - Name: %s#%s - ID: %s", m.Author.ID, m.Author.Username, m.Author.Discriminator, m.Author.ID)
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+				Name:   "Author",
+				Value:  payload,
+				Inline: true,
+			})
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+				Name:   "Content",
+				Value:  strings.Replace(m.Content, "`", "", -1),
+				Inline: true,
+			})
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+				Name:   "Channel",
+				Value:  "<#" + m.ChannelID + ">",
+				Inline: true,
+			})
+
+			targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
+			if targetChannel == "" {
+				fmt.Println("No channel set up for moderation actions")
+				return
+			}
+
 			s.ChannelMessageSendEmbed(targetChannel, embed)
 			return
 		}
