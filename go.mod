@@ -6,7 +6,7 @@ require (
 	github.com/bwmarrin/discordgo v0.28.1
 	github.com/dghubble/go-twitter v0.0.0-20221104224141-912508c3888b
 	github.com/dghubble/oauth1 v0.7.3
-	github.com/jessevdk/go-flags v1.5.0
+	github.com/jessevdk/go-flags v1.6.1
 	github.com/lib/pq v1.10.9
 	github.com/pajbot/basecommand v1.0.0
 	github.com/pajbot/commandmatcher v1.0.1
@@ -26,7 +26,7 @@ require (
 	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/mod v0.14.0 // indirect
-	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.14.0 // indirect
 )
