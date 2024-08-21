@@ -32,8 +32,8 @@ func New() *Command {
 func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) pkg.CommandResult {
 	if len(parts) >= 2 {
 		number, err := strconv.Atoi(parts[1])
-		if err == nil && number >= 2 {
-			v := 1 + rand.Intn(number-1)
+		if err == nil && number >= 1 {
+			v := 1 + rand.Intn(number)
 			response := discordgo.MessageSend{
 				Content: fmt.Sprintf("%s, %d", m.Author.Mention(), v),
 			}
