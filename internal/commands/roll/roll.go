@@ -9,6 +9,7 @@ import (
 	"github.com/pajbot/basecommand"
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
+	"github.com/pajbot/pajbot2-discord/pkg/utils"
 )
 
 var _ pkg.Command = &Command{}
@@ -34,10 +35,8 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		number, err := strconv.Atoi(parts[1])
 		if err == nil && number >= 1 {
 			v := 1 + rand.Intn(number)
-			response := discordgo.MessageSend{
-				Content: fmt.Sprintf("%s, %d", m.Author.Mention(), v),
-			}
-			s.ChannelMessageSendComplex(m.ChannelID, &response)
+			response := fmt.Sprintf("%d", v)
+			utils.Reply(s, m, response)
 		}
 	}
 	return pkg.CommandResultUserCooldown
