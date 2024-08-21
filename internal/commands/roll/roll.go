@@ -40,7 +40,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 			s.ChannelMessageSendComplex(m.ChannelID, &response)
 		}
 	}
-	return pkg.CommandResultFullCooldown
+	return pkg.CommandResultUserCooldown
 }
 
 func (c *Command) Description() string {
