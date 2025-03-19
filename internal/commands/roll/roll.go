@@ -9,6 +9,7 @@ import (
 	"github.com/pajbot/basecommand"
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
+	"github.com/pajbot/pajbot2-discord/pkg/utils"
 )
 
 var _ pkg.Command = &Command{}
@@ -33,13 +34,12 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	if len(parts) >= 2 {
 		number, err := strconv.Atoi(parts[1])
 		if err == nil && number >= 1 {
-			response := discordgo.MessageSend{
-				Content: fmt.Sprintf("%s, %d", m.Author.Mention(), rand.Intn(number)),
-			}
-			s.ChannelMessageSendComplex(m.ChannelID, &response)
+			v := 1 + rand.Intn(number)
+			response := fmt.Sprintf("%d", v)
+			utils.Reply(s, m, response)
 		}
 	}
-	return pkg.CommandResultFullCooldown
+	return pkg.CommandResultUserCooldown
 }
 
 func (c *Command) Description() string {

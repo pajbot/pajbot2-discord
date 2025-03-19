@@ -3,6 +3,7 @@
 ## 2023-04-10
 
 - Add basic support for slash commands. (#81)
+- Fix: $roll is now 1-"indexed". (#139)
 
 ## Undated
 
