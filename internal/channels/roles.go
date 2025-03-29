@@ -8,11 +8,12 @@ import (
 
 var (
 	validChannelRoles = map[string]bool{
-		"action-log":         true,
-		"moderation-action":  true,
-		"weeb-channel":       true,
-		"system-messages":    true,
-		"connection-updates": true,
+		"action-log":          true,
+		"moderation-action":   true,
+		"weeb-channel":        true,
+		"system-messages":     true,
+		"connection-updates":  true,
+		"manual-verification": true,
 	}
 )
 

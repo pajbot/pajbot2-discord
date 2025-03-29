@@ -1254,7 +1254,8 @@ func onMemberJoin(s *discordgo.Session, m *discordgo.GuildMemberAdd, sqlClient *
 				// TODO: Generate URL based on config stuff
 				connectionURL := fmt.Sprintf("%s/login?code=%s", config.Domain, connectionID)
 
-				messageContent := fmt.Sprintf("Hi! You need to authenticate to join the Discord. Please click [this link](<%s>) and sign in with your Twitch account to continue. If you run into any issues, ask for help in the help channel.", connectionURL)
+				manualVerificationChannel := channels.Get(m.GuildID, "manual-verification")
+				messageContent := fmt.Sprintf("Hi! You need to authenticate to join the Discord. Please click [this link](<%s>) and sign in with your Twitch account to continue.\n\nIf you run into any issues, ask for help in the <#%s> channel, or rejoin the server to try again.", connectionURL, manualVerificationChannel)
 
 				// Send the user a DM with a link to where they can authenticate
 				// TODO: could this be done in a channel where we show a message only to them somehow?
