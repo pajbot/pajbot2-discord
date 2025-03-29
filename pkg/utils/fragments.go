@@ -11,7 +11,7 @@ var (
 )
 
 func EscapeMarkdown(s string) string {
-	return markdownRegex.ReplaceAllString(s, "\\\\$0")
+	return markdownRegex.ReplaceAllString(s, `\$0`)
 }
 
 func MentionMember(member *discordgo.Member) string {
