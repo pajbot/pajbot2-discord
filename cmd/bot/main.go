@@ -22,6 +22,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/pajbot2-discord/internal/autoreact"
+	"github.com/pajbot/pajbot2-discord/internal/channels"
 	"github.com/pajbot/pajbot2-discord/internal/config"
 	"github.com/pajbot/pajbot2-discord/internal/connection"
 	"github.com/pajbot/pajbot2-discord/internal/filter"
@@ -219,9 +220,9 @@ func (a *App) postConnectionUpdate(member *discordgo.Member, existingConnection 
 	embed := &discordgo.MessageEmbed{
 		Title: "User Connection Update",
 	}
-	targetChannel := serverconfig.Get(member.GuildID, "channel:system-messages")
+	targetChannel := channels.Get(member.GuildID, "connection-updates", "system-messages")
 	if targetChannel == "" {
-		fmt.Println("No channel set up for system messages")
+		fmt.Println("No channel set up for connection updates")
 		return
 	}
 
