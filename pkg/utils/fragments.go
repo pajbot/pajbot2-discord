@@ -3,16 +3,7 @@ package utils
 import (
 	"fmt"
 	"github.com/bwmarrin/discordgo"
-	"regexp"
 )
-
-var (
-	markdownRegex = regexp.MustCompile(`[_*~|]{1,2}|\\x60{1,3}`)
-)
-
-func EscapeMarkdown(s string) string {
-	return markdownRegex.ReplaceAllString(s, `\$0`)
-}
 
 func MentionMember(member *discordgo.Member) string {
 	// user is member of guild. We can mention them with <@!ID> to display their nickname,
