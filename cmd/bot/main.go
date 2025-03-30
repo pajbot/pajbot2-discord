@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"database/sql"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -19,9 +22,12 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/pajbot2-discord/internal/autoreact"
+	"github.com/pajbot/pajbot2-discord/internal/channels"
 	"github.com/pajbot/pajbot2-discord/internal/config"
+	"github.com/pajbot/pajbot2-discord/internal/connection"
 	"github.com/pajbot/pajbot2-discord/internal/filter"
 	"github.com/pajbot/pajbot2-discord/internal/mute"
+	"github.com/pajbot/pajbot2-discord/internal/roles"
 	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
 	"github.com/pajbot/pajbot2-discord/internal/slashcommands"
 	"github.com/pajbot/pajbot2-discord/pkg"
@@ -30,6 +36,8 @@ import (
 	sharedutils "github.com/pajbot/utils"
 	normalize "github.com/pajlada/lidl-normalize"
 	"github.com/pajlada/stupidmigration"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/twitch"
 
 	_ "github.com/lib/pq"
 
@@ -42,6 +50,7 @@ import (
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/color"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/colors"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/configure"
+	_ "github.com/pajbot/pajbot2-discord/internal/commands/dev"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/eightball"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/guildinfo"
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/modcommands"
@@ -63,9 +72,74 @@ const (
 	timeBetweenAttachmentCleanups = 15 * time.Minute
 )
 
+type pendingConnection struct {
+	connectionID   string
+	discordUserID  string
+	discordGuildID string
+	state          string
+}
+
+var approvalForceTwitch = oauth2.SetAuthURLParam("force_verify", "true")
+
+var connectionIDMutex = sync.Mutex{}
+var connectionIDs = map[string]*pendingConnection{}
+
+// registerPendingConnection returns the connection ID for this user
+func registerPendingConnection(discordUserID, discordGuildID string) string {
+	connectionIDMutex.Lock()
+	defer connectionIDMutex.Unlock()
+	connectionID, err := utils.GenerateRandomStringURLSafe(12)
+	if err != nil {
+		panic(err)
+	}
+
+	var tokenBytes [255]byte
+	if _, err := cryptorand.Read(tokenBytes[:]); err != nil {
+		panic(err)
+	}
+
+	connectionIDs[connectionID] = &pendingConnection{
+		connectionID:   connectionID,
+		discordUserID:  discordUserID,
+		discordGuildID: discordGuildID,
+		state:          hex.EncodeToString(tokenBytes[:]),
+	}
+
+	return connectionID
+}
+
+func getPendingConnection(connectionID string) *pendingConnection {
+	connectionIDMutex.Lock()
+	defer connectionIDMutex.Unlock()
+	return connectionIDs[connectionID]
+}
+func getPendingConnectionByState(state string) (string, *pendingConnection) {
+	connectionIDMutex.Lock()
+	defer connectionIDMutex.Unlock()
+	for connectionID, pendingConnection := range connectionIDs {
+		if pendingConnection.state == state {
+			return connectionID, pendingConnection
+		}
+	}
+	return "", nil
+}
+
+func unregisterPendingConnection(connectionID string) {
+	connectionIDMutex.Lock()
+	defer connectionIDMutex.Unlock()
+	delete(connectionIDs, connectionID)
+}
+
+type twitchValidateResponse struct {
+	Login  string `json:"login"`
+	UserID string `json:"user_id"`
+}
+
 var sqlClient *sql.DB
 
 func init() {
+	connectionID := registerPendingConnection("417007784890990592", "138009976613502976")
+	fmt.Println("CONNECTION ID", connectionID)
 	var err error
 	sqlClient, err = sql.Open("postgres", config.DSN)
 	if err != nil {
@@ -96,9 +170,224 @@ type App struct {
 	filterRunner *filter.Runner
 }
 
+func (a *App) registerUser(pendingConnection *pendingConnection, twitchUser twitchValidateResponse) {
+	defer unregisterPendingConnection(pendingConnection.connectionID)
+	membersRole := roles.GetSingle(pendingConnection.discordGuildID, "member")
+	if membersRole == "" {
+		fmt.Println("Error applying members role: There's no members role in the server ??")
+		return
+	}
+
+	if err := a.bot.GuildMemberRoleAdd(pendingConnection.discordGuildID, pendingConnection.discordUserID, membersRole); err != nil {
+		fmt.Println("Error adding members role to user:", pendingConnection, twitchUser, err)
+	}
+
+	existingConnection, err := connection.Get(sqlClient, pendingConnection.discordGuildID, pendingConnection.discordUserID)
+	if err != nil {
+		fmt.Println("error getting existing connection:", pendingConnection, twitchUser, err)
+		return
+	}
+
+	member, err := a.bot.GuildMember(pendingConnection.discordGuildID, pendingConnection.discordUserID)
+	if err != nil {
+		fmt.Println("error getting member:", pendingConnection, twitchUser, err)
+		return
+	}
+
+	if err := connection.Upsert(sqlClient, pendingConnection.discordGuildID, pendingConnection.discordUserID, member.User.Username, twitchUser.UserID, twitchUser.Login); err != nil {
+		fmt.Println("Error upserting into db:", pendingConnection, twitchUser, err)
+		return
+	}
+
+	a.postConnectionUpdate(member, existingConnection, twitchUser)
+
+	if err := roles.Grant(a.bot, pendingConnection.discordGuildID, pendingConnection.discordUserID, "member"); err != nil {
+		fmt.Println("Error adding Members role to user:", err)
+	} else {
+		fmt.Printf("Granted Members role to %s (%s)\n", member.User.Username, member.User.ID)
+	}
+}
+
+func formatConnection(connection *connection.DiscordConnection) string {
+	if connection == nil {
+		panic("connection may not be nil in formatConnection")
+	}
+
+	return fmt.Sprintf("`%s` (TUID `%s`)", utils.EscapeCodeBlock(connection.TwitchUserLogin), connection.TwitchUserID)
+}
+
+func (a *App) postConnectionUpdate(member *discordgo.Member, existingConnection *connection.DiscordConnection, twitchUser twitchValidateResponse) {
+	embed := &discordgo.MessageEmbed{
+		Title: "User Connection Update",
+	}
+	targetChannel := channels.Get(member.GuildID, "connection-updates", "system-messages")
+	if targetChannel == "" {
+		fmt.Println("No channel set up for connection updates")
+		return
+	}
+
+	embed.Thumbnail = &discordgo.MessageEmbedThumbnail{
+		URL:    member.User.AvatarURL("64x64"),
+		Width:  64,
+		Height: 64,
+	}
+
+	payload := utils.MentionMember(member)
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Name", Value: payload})
+
+	fmt.Println(existingConnection)
+
+	if existingConnection != nil {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "Previous connection",
+			Value:  formatConnection(existingConnection),
+			Inline: false,
+		})
+	}
+
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "New connection",
+		Value:  fmt.Sprintf("`%s` (TUID `%s`)", utils.EscapeCodeBlock(twitchUser.Login), twitchUser.UserID),
+		Inline: false,
+	})
+
+	altConnections, err := connection.GetByTwitchID(sqlClient, twitchUser.UserID, member.GuildID, member.User.ID)
+	if err != nil {
+		fmt.Println("Error getting alt connections:", err)
+	} else {
+		if len(altConnections) > 0 {
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+				Name:   "Alt Detection",
+				Value:  formatAltConnections(altConnections),
+				Inline: false,
+			})
+		}
+	}
+
+	if _, err := a.bot.ChannelMessageSendEmbed(targetChannel, embed); err != nil {
+		fmt.Println("Error sending message embed:", err)
+	}
+}
+
+func formatAltConnections(altConnections []*connection.DiscordConnection) string {
+	var b strings.Builder
+
+	first := true
+
+	for _, c := range altConnections {
+		if !first {
+			b.WriteString(", ")
+		}
+
+		b.WriteString(fmt.Sprintf("did: `%s`, dname: `%s`", c.DiscordUserID, utils.EscapeCodeBlock(c.DiscordUserName)))
+
+		first = false
+	}
+
+	return b.String()
+}
+
+func (a *App) startWebServer(ctx context.Context) error {
+	scopes := []string{}
+
+	oauth2Config := &oauth2.Config{
+		ClientID:     config.TwitchClientID,
+		ClientSecret: config.TwitchClientSecret,
+		Scopes:       scopes,
+		Endpoint:     twitch.Endpoint,
+		RedirectURL:  config.TwitchRedirectURI,
+	}
+
+	// Redirect user to twitch page
+	http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		connectionID := r.FormValue("code")
+		if connectionID == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "missing connection ID")
+			return
+		}
+
+		// Validate code
+		pendingConnection := getPendingConnection(connectionID)
+		if pendingConnection == nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "bad connection ID")
+			return
+		}
+
+		fmt.Println("Redirecting login for", pendingConnection)
+
+		http.Redirect(w, r, oauth2Config.AuthCodeURL(pendingConnection.state, approvalForceTwitch), http.StatusTemporaryRedirect)
+	})
+
+	http.HandleFunc("/login/authorized", func(w http.ResponseWriter, r *http.Request) {
+		state := r.FormValue("state")
+		if state == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "missing state")
+			return
+		}
+
+		// Validate state
+		connectionID, pendingConnection := getPendingConnectionByState(state)
+		if pendingConnection == nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "bad state")
+			return
+		}
+
+		token, err := oauth2Config.Exchange(ctx, r.FormValue("code"))
+		if err != nil {
+			fmt.Println("Error exchanging code", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "internal server error")
+			unregisterPendingConnection(connectionID)
+			return
+		}
+
+		go func() {
+			// Fetch user ID
+			req, err := http.NewRequest("GET", "https://id.twitch.tv/oauth2/validate", nil)
+			if err != nil {
+				fmt.Println("error making request to validate twitch token", err)
+				unregisterPendingConnection(connectionID)
+				return
+			}
+
+			req.Header.Add("Authorization", fmt.Sprintf("OAuth %s", token.AccessToken))
+
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				fmt.Println("error in request to validate twitch token", err)
+				unregisterPendingConnection(connectionID)
+				return
+			}
+
+			structuredResponse := twitchValidateResponse{}
+
+			if err := json.NewDecoder(res.Body).Decode(&structuredResponse); err != nil {
+				fmt.Println("error decoding validate twitch token response:", err)
+				unregisterPendingConnection(connectionID)
+				return
+			}
+
+			go a.registerUser(pendingConnection, structuredResponse)
+		}()
+	})
+
+	go func() {
+		if err := http.ListenAndServe(config.WebListenAddr, nil); err != nil {
+			fmt.Println("Error in http listen and serve:", err)
+		}
+	}()
+
+	return nil
+}
+
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	bot, err := discordgo.New("Bot " + config.Token)
 	if err != nil {
 		fmt.Println("error creating Discord session,", err)
@@ -241,13 +530,16 @@ func main() {
 	bot.AddHandler(onMessageDeleted)
 	bot.AddHandler(app.onMessageEdited)
 	bot.AddHandler(onUserBanned)
-	bot.AddHandler(onUserJoined)
 	bot.AddHandler(onUserLeft)
 	bot.AddHandler(onMessageReactionAdded)
 	bot.AddHandler(onMessageReactionRemoved)
 	bot.AddHandler(func(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 		onMemberJoin(s, m, sqlClient)
 	})
+
+	if err := app.startWebServer(ctx); err != nil {
+		panic(err)
+	}
 
 	// Open a websocket connection to Discord and begin listening.
 	err = bot.Open()
@@ -312,7 +604,7 @@ var attachmentsMutex = sync.Mutex{}
 const noInvites = true
 
 func (a *App) postToActionLog(guildID, title string, fields []*discordgo.MessageEmbedField) {
-	targetChannel := serverconfig.Get(guildID, "channel:action-log")
+	targetChannel := channels.Get(guildID, "action-log")
 	if targetChannel == "" {
 		fmt.Println("No channel set up for action log")
 		return
@@ -369,7 +661,7 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 				Inline: true,
 			})
 
-			targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
+			targetChannel := channels.Get(m.GuildID, "action-log")
 			if targetChannel == "" {
 				fmt.Println("No channel set up for moderation actions")
 				return
@@ -415,7 +707,7 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 				Inline: true,
 			})
 
-			targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
+			targetChannel := channels.Get(m.GuildID, "action-log")
 			if targetChannel == "" {
 				fmt.Println("No channel set up for moderation actions")
 				return
@@ -505,7 +797,7 @@ func (a *App) onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) 
 		fmt.Printf("on message edit: Error getting full message '%s': %s\n", m.ID, err)
 		return
 	}
-	targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
+	targetChannel := channels.Get(m.GuildID, "action-log")
 	if targetChannel == "" {
 		fmt.Println("No channel set up for action log")
 		return
@@ -596,7 +888,7 @@ func (a *App) onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) 
 				Inline: true,
 			})
 
-			targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
+			targetChannel := channels.Get(m.GuildID, "action-log")
 			if targetChannel == "" {
 				fmt.Println("No channel set up for moderation actions")
 				return
@@ -653,7 +945,7 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 		}
 	}
 
-	targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
+	targetChannel := channels.Get(m.GuildID, "action-log")
 	if targetChannel == "" {
 		fmt.Println("No channel set up for action log")
 		return
@@ -738,7 +1030,7 @@ func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
 				return
 			}
 
-			targetChannel := serverconfig.Get(m.GuildID, "channel:moderation-action")
+			targetChannel := channels.Get(m.GuildID, "moderation-action")
 			if targetChannel == "" {
 				fmt.Println("No channel set up for moderation actions")
 				return
@@ -769,13 +1061,13 @@ func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
 	}()
 }
 
-func postUserInfo(s *discordgo.Session, member *discordgo.Member, title string) {
+func postUserInfo(s *discordgo.Session, member *discordgo.Member, title string, extraFields []discordgo.MessageEmbedField) {
 	embed := &discordgo.MessageEmbed{
 		Title: title,
 	}
-	targetChannel := serverconfig.Get(member.GuildID, "channel:system-messages")
+	targetChannel := channels.Get(member.GuildID, "system-messages")
 	if targetChannel == "" {
-		fmt.Println("No channel set up for system messages")
+		fmt.Println(member.GuildID, "No channel set up for system messages")
 		return
 	}
 
@@ -795,6 +1087,10 @@ func postUserInfo(s *discordgo.Session, member *discordgo.Member, title string) 
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Name", Value: payload})
 	payload = fmt.Sprintf("%s (%s ago)", accountCreationDate.Format("2006-01-02 15:04:05"), sharedutils.TimeSince(accountCreationDate))
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Account Created", Value: payload})
+
+	for _, extraField := range extraFields {
+		embed.Fields = append(embed.Fields, &extraField)
+	}
 
 	_, err = s.ChannelMessageSendEmbed(targetChannel, embed)
 	if err != nil {
@@ -825,31 +1121,20 @@ func banIfUserIsYoungerThan(s *discordgo.Session, m *discordgo.GuildMemberAdd, m
 	}
 }
 
-func onUserJoined(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
-	postUserInfo(s, m.Member, "User Joined")
-
-	if m.GuildID == forsenServerID {
-		fmt.Printf("Granting members role to %s (%s)\n", m.User.Username, m.User.ID)
-		if err := s.GuildMemberRoleAdd(m.GuildID, m.User.ID, membersRole); err != nil {
-			fmt.Println("Error adding Members role to user:", err)
-		}
-	}
-
-	// banIfUserIsYoungerThan(s, m, 1*time.Hour)
-}
-
 func onUserLeft(s *discordgo.Session, m *discordgo.GuildMemberRemove) {
-	postUserInfo(s, m.Member, "User Left")
+	postUserInfo(s, m.Member, "User Left", nil)
 }
 
 // const weebMessageID = `552788256333234176`
 const weebMessageID = `889819209507438603`
 const reactionBye = "👋"
-const membersRole = `825354461102473226`
+
+// forsen members role
+// const membersRole = `825354461102473226`
 const forsenServerID = `97034666673975296`
 
 func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
-	targetChannel := serverconfig.Get(m.GuildID, "channel:weeb-channel")
+	targetChannel := channels.Get(m.GuildID, "weeb-channel")
 	if targetChannel == "" {
 		fmt.Println("No channel set up for weeb channel (good)")
 		return
@@ -885,7 +1170,7 @@ func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAd
 }
 
 func onMessageReactionRemoved(s *discordgo.Session, m *discordgo.MessageReactionRemove) {
-	targetChannel := serverconfig.Get(m.GuildID, "channel:weeb-channel")
+	targetChannel := channels.Get(m.GuildID, "weeb-channel")
 	if targetChannel == "" {
 		fmt.Println("No channel set up for weeb channel (good)")
 		return
@@ -925,4 +1210,87 @@ func onMemberJoin(s *discordgo.Session, m *discordgo.GuildMemberAdd, sqlClient *
 	if err != nil {
 		fmt.Println("Error when seeing if we need to reapply mute:", err)
 	}
+
+	fields := []discordgo.MessageEmbedField{}
+
+	autoGrantMemberRole := serverconfig.Get(m.GuildID, "value:member_role_mode")
+	if autoGrantMemberRole == "1" {
+		if err := roles.Grant(s, m.GuildID, m.User.ID, "member"); err != nil {
+			fmt.Println("Error adding Members role to user:", err)
+		} else {
+			fmt.Printf("Granted Members role to %s (%s)\n", m.User.Username, m.User.ID)
+		}
+	} else if autoGrantMemberRole == "2" {
+		existingConnection, err := connection.Get(sqlClient, m.GuildID, m.User.ID)
+		if err != nil {
+			fmt.Println("Error getting current connection:", err)
+			fields = append(fields, discordgo.MessageEmbedField{
+				Name:   "Error",
+				Value:  "Error getting current connection:" + err.Error(),
+				Inline: false,
+			})
+		} else {
+			if existingConnection != nil {
+				// User had a connection already
+				fields = append(fields, discordgo.MessageEmbedField{
+					Name:   "Existing Connection",
+					Value:  fmt.Sprintf("Twitch %s (%s)", existingConnection.TwitchUserLogin, existingConnection.TwitchUserID),
+					Inline: false,
+				})
+				if err := roles.Grant(s, m.GuildID, m.User.ID, "member"); err != nil {
+					fmt.Println("Error adding Members role to user:", err)
+				} else {
+					fmt.Printf("Granted Members role to %s (%s)\n", m.User.Username, m.User.ID)
+				}
+			} else {
+				// User had no existing connection
+
+				// Generate connection ID
+				connectionID := registerPendingConnection(m.User.ID, m.GuildID)
+
+				// Put that connection ID in a memory map
+				registerPendingConnection(connectionID, m.User.ID)
+
+				// TODO: Generate URL based on config stuff
+				connectionURL := fmt.Sprintf("%s/login?code=%s", config.Domain, connectionID)
+
+				manualVerificationChannel := channels.Get(m.GuildID, "manual-verification")
+				messageContent := fmt.Sprintf("Hi! You need to authenticate to join the Discord. Please click [this link](<%s>) and sign in with your Twitch account to continue.\n\nIf you run into any issues, ask for help in the <#%s> channel, or rejoin the server to try again.", connectionURL, manualVerificationChannel)
+
+				// Send the user a DM with a link to where they can authenticate
+				// TODO: could this be done in a channel where we show a message only to them somehow?
+				channel, err := s.UserChannelCreate(m.User.ID)
+				if err != nil {
+					fmt.Println("Something went wrong DMing", m.User.ID, err)
+					fields = append(fields, discordgo.MessageEmbedField{
+						Name:   "Error",
+						Value:  "Failed to open DM",
+						Inline: false,
+					})
+				} else {
+					_, err := s.ChannelMessageSend(channel.ID, messageContent)
+					if err != nil {
+						fmt.Println("Something went wrong DMing", m.User.ID, err)
+						fields = append(fields, discordgo.MessageEmbedField{
+							Name:   "Error",
+							Value:  "Failed to send DM",
+							Inline: false,
+						})
+					} else {
+						fields = append(fields, discordgo.MessageEmbedField{
+							Name:   "ConnectionID",
+							Value:  connectionID,
+							Inline: false,
+						})
+					}
+				}
+
+			}
+		}
+	}
+
+	postUserInfo(s, m.Member, "User Joined", fields)
+
+	// banIfUserIsYoungerThan(s, m, 1*time.Hour)
+
 }

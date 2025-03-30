@@ -64,6 +64,8 @@ var unicodeEmojiRegex = regexp.MustCompile(`[\x{00A0}-\x{1F9EF}]`)
 func (c *Command) configureValue(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
 	validKeys := map[string]string{
 		"pajbot_host": "The host used for any pajbot API requests and commands (like $points). Example value: forsen.tv. Assumes https schema and standard api path.",
+
+		"member_role_mode": "0 = dont use, 1 = auto grant, 2 = require twitch verification",
 	}
 
 	const usage = "usage: $configure value (reset/set/get/keys) [key [value]]"

@@ -1,6 +1,11 @@
 package roles
 
-import "github.com/pajbot/pajbot2-discord/internal/serverconfig"
+import (
+	"fmt"
+
+	"github.com/bwmarrin/discordgo"
+	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
+)
 
 var (
 	validRoles = map[string]bool{
@@ -9,6 +14,7 @@ var (
 		"admin":        true,
 		"muted":        true,
 		"nitrobooster": true,
+		"member":       true,
 	}
 )
 
@@ -36,4 +42,18 @@ func Get(serverID, roleName string) (roleIDs []string) {
 	}
 
 	return
+}
+
+func Grant(s *discordgo.Session, guildID, userID, roleName string) error {
+	roleID := GetSingle(guildID, roleName)
+	if roleID == "" {
+		return fmt.Errorf("no role '%s' set in %s", roleName, guildID)
+	}
+
+	fmt.Printf("Granting %s role to %s\n", roleName, userID)
+	if err := s.GuildMemberRoleAdd(guildID, userID, roleID); err != nil {
+		return fmt.Errorf("role add %s %s: %w", roleName, userID, err)
+	}
+
+	return nil
 }
