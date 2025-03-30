@@ -47,12 +47,12 @@ func Get(serverID, roleName string) (roleIDs []string) {
 func Grant(s *discordgo.Session, guildID, userID, roleName string) error {
 	roleID := GetSingle(guildID, roleName)
 	if roleID == "" {
-		return fmt.Errorf("No role '%s' set in %s", roleName, guildID)
+		return fmt.Errorf("no role '%s' set in %s", roleName, guildID)
 	}
 
 	fmt.Printf("Granting %s role to %s\n", roleName, userID)
 	if err := s.GuildMemberRoleAdd(guildID, userID, roleID); err != nil {
-		return fmt.Errorf("GuildMemberRoleAdd %s %s: %w", roleName, userID, err)
+		return fmt.Errorf("role add %s %s: %w", roleName, userID, err)
 	}
 
 	return nil
