@@ -604,7 +604,7 @@ var attachmentsMutex = sync.Mutex{}
 const noInvites = true
 
 func (a *App) postToActionLog(guildID, title string, fields []*discordgo.MessageEmbedField) {
-	targetChannel := serverconfig.Get(guildID, "channel:action-log")
+	targetChannel := channels.Get(guildID, "action-log")
 	if targetChannel == "" {
 		fmt.Println("No channel set up for action log")
 		return
@@ -661,7 +661,7 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 				Inline: true,
 			})
 
-			targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
+			targetChannel := channels.Get(m.GuildID, "action-log")
 			if targetChannel == "" {
 				fmt.Println("No channel set up for moderation actions")
 				return
@@ -707,7 +707,7 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 				Inline: true,
 			})
 
-			targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
+			targetChannel := channels.Get(m.GuildID, "action-log")
 			if targetChannel == "" {
 				fmt.Println("No channel set up for moderation actions")
 				return
@@ -797,7 +797,7 @@ func (a *App) onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) 
 		fmt.Printf("on message edit: Error getting full message '%s': %s\n", m.ID, err)
 		return
 	}
-	targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
+	targetChannel := channels.Get(m.GuildID, "action-log")
 	if targetChannel == "" {
 		fmt.Println("No channel set up for action log")
 		return
@@ -888,7 +888,7 @@ func (a *App) onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) 
 				Inline: true,
 			})
 
-			targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
+			targetChannel := channels.Get(m.GuildID, "action-log")
 			if targetChannel == "" {
 				fmt.Println("No channel set up for moderation actions")
 				return
@@ -945,7 +945,7 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 		}
 	}
 
-	targetChannel := serverconfig.Get(m.GuildID, "channel:action-log")
+	targetChannel := channels.Get(m.GuildID, "action-log")
 	if targetChannel == "" {
 		fmt.Println("No channel set up for action log")
 		return
@@ -1030,7 +1030,7 @@ func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
 				return
 			}
 
-			targetChannel := serverconfig.Get(m.GuildID, "channel:moderation-action")
+			targetChannel := channels.Get(m.GuildID, "moderation-action")
 			if targetChannel == "" {
 				fmt.Println("No channel set up for moderation actions")
 				return
@@ -1065,9 +1065,9 @@ func postUserInfo(s *discordgo.Session, member *discordgo.Member, title string, 
 	embed := &discordgo.MessageEmbed{
 		Title: title,
 	}
-	targetChannel := serverconfig.Get(member.GuildID, "channel:system-messages")
+	targetChannel := channels.Get(member.GuildID, "system-messages")
 	if targetChannel == "" {
-		fmt.Println("No channel set up for system messages")
+		fmt.Println(member.GuildID, "No channel set up for system messages")
 		return
 	}
 
@@ -1134,7 +1134,7 @@ const reactionBye = "👋"
 const forsenServerID = `97034666673975296`
 
 func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
-	targetChannel := serverconfig.Get(m.GuildID, "channel:weeb-channel")
+	targetChannel := channels.Get(m.GuildID, "weeb-channel")
 	if targetChannel == "" {
 		fmt.Println("No channel set up for weeb channel (good)")
 		return
@@ -1170,7 +1170,7 @@ func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAd
 }
 
 func onMessageReactionRemoved(s *discordgo.Session, m *discordgo.MessageReactionRemove) {
-	targetChannel := serverconfig.Get(m.GuildID, "channel:weeb-channel")
+	targetChannel := channels.Get(m.GuildID, "weeb-channel")
 	if targetChannel == "" {
 		fmt.Println("No channel set up for weeb channel (good)")
 		return
