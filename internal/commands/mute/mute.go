@@ -7,8 +7,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/basecommand"
+	"github.com/pajbot/pajbot2-discord/internal/channels"
 	"github.com/pajbot/pajbot2-discord/internal/roles"
-	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
 	"github.com/pajbot/pajbot2-discord/pkg/utils"
@@ -32,6 +32,7 @@ func New() *Command {
 }
 
 func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) (res pkg.CommandResult) {
+	// TODO: Deprecate
 	res = pkg.CommandResultNoCooldown
 	const usage = `$mute @user duration <reason> (i.e. $mute @user 1h5m shitposting in serious channel)`
 
@@ -106,18 +107,71 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	// Announce mute success in channel
 	s.ChannelMessageSend(m.ChannelID, resultMessage)
 
-	targetChannel := serverconfig.Get(m.GuildID, "channel:moderation-action")
-	if targetChannel == "" {
-		fmt.Println("No channel set up for moderation actions")
-		return
+	targetChannel := channels.Get(m.GuildID, "moderation-action")
+	if targetChannel != "" {
+		// Announce mute in moderation-action channel
+		s.ChannelMessageSend(targetChannel, resultMessage)
 	}
-
-	// Announce mute in moderation-action channel
-	s.ChannelMessageSend(targetChannel, resultMessage)
 
 	return
 }
 
 func (c *Command) Description() string {
 	return c.Command.Description
+}
+
+func Execute(s *discordgo.Session, guildID string, moderator *discordgo.User, target *discordgo.User, durationString, reason string) (string, error) {
+	var duration time.Duration
+	message := ""
+
+	hasAccess, err := utils.MemberHasPermission(s, guildID, moderator.ID, "minimod")
+	if err != nil {
+		return message, fmt.Errorf("permission error: %w", err)
+	}
+	if !hasAccess {
+		return message, fmt.Errorf("you don't have permission to use this command")
+	}
+
+	mutedRole := roles.GetSingle(guildID, "muted")
+	if mutedRole == "" {
+		return message, fmt.Errorf("no muted role has been assigned")
+	}
+
+	duration, err = pb2utils.ParseDuration(durationString)
+	if err != nil {
+		return message, fmt.Errorf("invalid duration: %w", err)
+	}
+
+	if duration < 1*time.Minute {
+		duration = 1 * time.Minute
+	} else if duration > 14*24*time.Hour {
+		duration = 14 * 24 * time.Hour
+	}
+
+	// Create queued up unmute action in database
+	muteEnd := time.Now().Add(duration)
+
+	query := "INSERT INTO discord_mutes (guild_id, user_id, reason, mute_start, mute_end) VALUES ($1, $2, $3, NOW(), $4) ON CONFLICT (guild_id, user_id) DO UPDATE SET reason=$3, mute_end=$4"
+	_, err = commands.SQLClient.Exec(query, guildID, target.ID, reason, muteEnd)
+	if err != nil {
+		return message, fmt.Errorf("sql error: %w", err)
+	}
+
+	// Assign muted role
+	err = s.GuildMemberRoleAdd(guildID, target.ID, mutedRole)
+	if err != nil {
+		return message, fmt.Errorf("error assigning muted role %w", err)
+	}
+
+	// TODO: result message should be different if mute was updated instead of inserted
+	const resultFormat = "%s muted %s for %s. reason: %s"
+	message = fmt.Sprintf(resultFormat, utils.MentionUser(s, guildID, moderator), utils.MentionUser(s, guildID, target), duration, reason)
+
+	targetChannel := channels.Get(guildID, "moderation-action")
+	if targetChannel != "" {
+		// Announce mute in moderation-action channel
+		s.ChannelMessageSend(targetChannel, message)
+	}
+
+	return message, nil
 }
