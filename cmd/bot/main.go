@@ -162,6 +162,8 @@ func init() {
 	commands.SQLClient = sqlClient
 
 	serverconfig.Load(sqlClient)
+
+	slashcommands.Initialize(sqlClient)
 }
 
 type App struct {
