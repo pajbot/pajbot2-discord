@@ -1,11 +1,20 @@
 package slashcommands
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 
 	"github.com/bwmarrin/discordgo"
 )
+
+var (
+	sqlClient *sql.DB
+)
+
+func Initialize(sqlClient_ *sql.DB) {
+	sqlClient = sqlClient_
+}
 
 type SlashCommand struct {
 	name    string
