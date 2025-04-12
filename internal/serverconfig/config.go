@@ -24,6 +24,12 @@ func Get(serverID, key string) string {
 	return ""
 }
 
+func GetValue(guildID, valueKey string) string {
+	key := "value:" + valueKey
+
+	return Get(guildID, key)
+}
+
 func set(serverID, key, newChannelID string) {
 	fullKey := serverID + ":" + key
 
