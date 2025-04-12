@@ -137,8 +137,6 @@ type twitchValidateResponse struct {
 var sqlClient *sql.DB
 
 func init() {
-	connectionID := registerPendingConnection("417007784890990592", "138009976613502976")
-	fmt.Println("CONNECTION ID", connectionID)
 	var err error
 	sqlClient, err = sql.Open("postgres", config.DSN)
 	if err != nil {
