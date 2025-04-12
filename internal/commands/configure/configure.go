@@ -259,8 +259,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		return
 	}
 
-	var configType string
-	configType = parts[0]
+	configType := parts[0]
 
 	// config type decides how we read the value
 	switch configType {
