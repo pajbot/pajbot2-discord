@@ -28,31 +28,6 @@ func New() *Command {
 	}
 }
 
-func (c *Command) configureTwitter(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
-	const usage = "usage: $configure twitter KEY(username) VALUE"
-	if len(parts) < 3 {
-		s.ChannelMessageSend(m.ChannelID, usage)
-		return
-	}
-	key := parts[1]
-	value := parts[2]
-
-	switch key {
-	case "username":
-	default:
-		s.ChannelMessageSend(m.ChannelID, "Invalid key argument. "+usage)
-		return
-	}
-
-	key = "twitter:" + key
-
-	err := serverconfig.Save(commands.SQLClient, m.GuildID, key, value)
-	if err != nil {
-		log.Println("SQL Error in set:", err)
-		return
-	}
-}
-
 var discordEmojiRegex = regexp.MustCompile(`<(a)?:([^<>:]+):([0-9]+)>`)
 
 var unicodeEmojiRegex = regexp.MustCompile(`[\x{00A0}-\x{1F9EF}]`)
@@ -254,7 +229,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 	parts = parts[1:]
 
 	if len(parts) == 0 {
-		const usage = "usage: $configure autoreact/twitter/channel/value ..."
+		const usage = "usage: $configure autoreact/value ..."
 		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%s, %s", m.Author.Mention(), usage))
 		return
 	}
@@ -271,7 +246,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		c.configureAutoReact(s, m, parts)
 
 	case "twitter":
-		c.configureTwitter(s, m, parts)
+		s.ChannelMessageSend(m.ChannelID, "twitter is dead")
 
 	case "channel":
 		const usage = "use the /channel command instead (admin only)"
