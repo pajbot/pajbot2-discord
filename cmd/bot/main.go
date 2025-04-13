@@ -30,6 +30,7 @@ import (
 	"github.com/pajbot/pajbot2-discord/internal/roles"
 	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
 	"github.com/pajbot/pajbot2-discord/internal/slashcommands"
+	"github.com/pajbot/pajbot2-discord/internal/twitchstreamannouncer"
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
 	"github.com/pajbot/pajbot2-discord/pkg/utils"
@@ -387,6 +388,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	<-rdyHelixClient
+	fmt.Println("Twitch API initialized")
+
 	bot, err := discordgo.New("Bot " + config.Token)
 	if err != nil {
 		fmt.Println("error creating Discord session,", err)
@@ -532,6 +536,10 @@ func main() {
 	bot.AddHandler(onUserLeft)
 	bot.AddHandler(onMessageReactionAdded)
 	bot.AddHandler(onMessageReactionRemoved)
+	bot.AddHandler(func(s *discordgo.Session, m *discordgo.GuildCreate) {
+		// Check streamer's live status occasionally and post it in the stream-status channel on updates
+		go twitchstreamannouncer.Start(ctx, m.Guild.ID, helixClient, bot)
+	})
 	bot.AddHandler(func(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 		onMemberJoin(s, m, sqlClient)
 	})

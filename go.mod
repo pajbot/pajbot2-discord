@@ -18,7 +18,9 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.5.0 // indirect
+	github.com/golang-jwt/jwt v3.2.1+incompatible // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/nicklaw5/helix v1.25.0 // indirect
 	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
 	golang.org/x/mod v0.24.0 // indirect

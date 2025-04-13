@@ -48,6 +48,11 @@ var (
 			DisplayName: "Manual verification",
 			Description: "",
 		},
+		"stream-announce": {
+			Name:        "stream-announce",
+			DisplayName: "Stream announce",
+			Description: "",
+		},
 	}
 )
 
