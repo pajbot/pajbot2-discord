@@ -20,10 +20,6 @@ var (
 	streamsMutex = sync.Mutex{}
 )
 
-type streamer struct {
-	Name string
-}
-
 type streamState struct {
 	Live            bool
 	UserLogin       string
