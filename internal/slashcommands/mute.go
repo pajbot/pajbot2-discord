@@ -1,6 +1,8 @@
 package slashcommands
 
 import (
+	"fmt"
+
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/pajbot2-discord/internal/commands/mute"
 )
@@ -43,10 +45,11 @@ func init() {
 			} else if i.User != nil {
 				moderator = i.User
 			} else {
+				fmt.Println("no moderator found?")
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
-						Content: "an invalid user was passed to the mute command?",
+						Content: "no moderator found?",
 					},
 				})
 				return
@@ -58,6 +61,7 @@ func init() {
 			muteReason := options[2].StringValue()
 
 			if userToMute == nil {
+				fmt.Println("Invalid user to mute")
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
@@ -68,6 +72,7 @@ func init() {
 			}
 
 			if message, err := mute.Execute(s, i.GuildID, moderator, userToMute, muteDuration, muteReason); err != nil {
+				fmt.Println("Error executing mute:", err)
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
@@ -75,6 +80,7 @@ func init() {
 					},
 				})
 			} else {
+				fmt.Println("Mute success")
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
