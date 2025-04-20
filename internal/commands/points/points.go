@@ -9,6 +9,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/basecommand"
 	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
+	"github.com/pajbot/pajbot2-discord/internal/values"
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
 )
@@ -38,7 +39,7 @@ func New() *Command {
 func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) (res pkg.CommandResult) {
 	res = pkg.CommandResultUserCooldown
 
-	pajbotHost := serverconfig.Get(m.GuildID, "value:pajbot_host")
+	pajbotHost := serverconfig.GetValue(m.GuildID, values.PajbotHost)
 
 	if pajbotHost == "" {
 		s.ChannelMessageSend(m.ChannelID, "This server does not have a pajbot host configured. Use the `$configure value` command to configure the `pajbot_host` key")

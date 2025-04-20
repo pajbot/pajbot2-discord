@@ -31,6 +31,7 @@ import (
 	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
 	"github.com/pajbot/pajbot2-discord/internal/slashcommands"
 	"github.com/pajbot/pajbot2-discord/internal/twitchstreamannouncer"
+	"github.com/pajbot/pajbot2-discord/internal/values"
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
 	"github.com/pajbot/pajbot2-discord/pkg/utils"
@@ -580,12 +581,15 @@ func main() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
+	fmt.Println("Exiting")
+
 	// Delete all registered slash commands
 	err = slashcommands.Delete(bot)
 	if err != nil {
-		fmt.Println("Error creating slash commands:", err)
+		fmt.Println("Error deleting slash commands:", err)
 		return
 	}
+	fmt.Println("Deleted slash commands")
 }
 
 func pushMessageIntoDatabase(m *discordgo.Message) (err error) {
@@ -1220,7 +1224,7 @@ func onMemberJoin(s *discordgo.Session, m *discordgo.GuildMemberAdd, sqlClient *
 
 	fields := []discordgo.MessageEmbedField{}
 
-	autoGrantMemberRole := serverconfig.Get(m.GuildID, "value:member_role_mode")
+	autoGrantMemberRole := serverconfig.GetValue(m.GuildID, values.MemberRoleMode)
 	if autoGrantMemberRole == "1" {
 		if err := roles.Grant(s, m.GuildID, m.User.ID, "member"); err != nil {
 			fmt.Println("Error adding Members role to user:", err)

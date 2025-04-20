@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -90,14 +91,22 @@ func (s *SlashCommands) Create(session *discordgo.Session) error {
 
 // Delete deletes all slash commands that were registered in all guilds
 func (s *SlashCommands) Delete(session *discordgo.Session) error {
+	wg := sync.WaitGroup{}
 	for _, cmd := range commands {
 		for _, registeredCommand := range cmd.registeredCommands {
-			err := session.ApplicationCommandDelete(session.State.User.ID, registeredCommand.GuildID, registeredCommand.ID)
-			if err != nil {
-				log.Printf("Error deleting command %v: %s", cmd, err)
-			}
+			wg.Add(1)
+			go func(registeredCommand *discordgo.ApplicationCommand) {
+				fmt.Println("Deleting command", registeredCommand)
+				err := session.ApplicationCommandDelete(session.State.User.ID, registeredCommand.GuildID, registeredCommand.ID)
+				if err != nil {
+					log.Printf("Error deleting command %v: %s", cmd, err)
+				}
+				wg.Done()
+			}(registeredCommand)
 		}
 	}
+
+	wg.Wait()
 
 	return nil
 }
