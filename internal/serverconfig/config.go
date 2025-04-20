@@ -30,6 +30,16 @@ func GetValue(guildID, valueKey string) string {
 	return Get(guildID, key)
 }
 
+func SetValue(sqlClient *sql.DB, guildID, valueKey, value string) error {
+	key := "value:" + valueKey
+	return Save(sqlClient, guildID, key, value)
+}
+
+func RemoveValue(sqlClient *sql.DB, guildID, valueKey string) error {
+	key := "value:" + valueKey
+	return Remove(sqlClient, guildID, key)
+}
+
 func set(serverID, key, newChannelID string) {
 	fullKey := serverID + ":" + key
 
