@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/pajbot/pajbot2-discord/internal/autoreact"
 	"github.com/pajbot/pajbot2-discord/internal/channels"
 	"github.com/pajbot/pajbot2-discord/internal/config"
 	"github.com/pajbot/pajbot2-discord/internal/connection"
@@ -767,7 +766,7 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	autoReactIDs := autoreact.Get(m.GuildID, m.ChannelID)
+	autoReactIDs := serverconfig.GetAutoReact(m.GuildID, m.ChannelID)
 	for _, emojiID := range autoReactIDs {
 		err := s.MessageReactionAdd(m.ChannelID, m.ID, emojiID)
 		if err != nil {

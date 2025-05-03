@@ -2,13 +2,9 @@ package configure
 
 import (
 	"fmt"
-	"log"
-	"regexp"
-	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/basecommand"
-	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
 	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
 	"github.com/pajbot/pajbot2-discord/pkg/utils"
@@ -25,72 +21,6 @@ type Command struct {
 func New() *Command {
 	return &Command{
 		Command: basecommand.New(),
-	}
-}
-
-var discordEmojiRegex = regexp.MustCompile(`<(a)?:([^<>:]+):([0-9]+)>`)
-
-var unicodeEmojiRegex = regexp.MustCompile(`[\x{00A0}-\x{1F9EF}]`)
-
-func (c *Command) configureAutoReact(s *discordgo.Session, m *discordgo.MessageCreate, parts []string) {
-	const usage = "usage: $configure autoreact (reset/set/get) EMOJIS..."
-	if len(parts) < 2 {
-		s.ChannelMessageSend(m.ChannelID, usage)
-		return
-	}
-	key := fmt.Sprintf("autoreact:%s", m.ChannelID)
-
-	switch parts[1] {
-	case "reset":
-		err := serverconfig.Remove(commands.SQLClient, m.GuildID, key)
-		if err != nil {
-			fmt.Println("error removing shit:", err)
-		}
-
-		return
-
-	case "get":
-		emojis := serverconfig.Get(m.GuildID, key)
-		s.ChannelMessageSend(m.ChannelID, "Current autoreact IDs: "+emojis)
-
-		return
-
-	case "set":
-		if len(parts) < 2 {
-			s.ChannelMessageSend(m.ChannelID, usage)
-			return
-		}
-
-		remainder := strings.Join(parts[2:], " ")
-
-		emojiIDs := unicodeEmojiRegex.FindAllString(remainder, -1)
-		discordEmojis := discordEmojiRegex.FindAllStringSubmatch(remainder, -1)
-
-		for _, discordEmoji := range discordEmojis {
-			emojiIDs = append(emojiIDs, fmt.Sprintf("%s:%s", discordEmoji[2], discordEmoji[3]))
-			// emojiIDs = append(emojiIDs, discordEmoji[0])
-		}
-
-		if len(emojiIDs) == 0 {
-			s.ChannelMessageSend(m.ChannelID, "no valid emojis passed to the set function 😕")
-			return
-		}
-
-		emojiIDsString := strings.Join(emojiIDs, ",")
-
-		s.ChannelMessageSend(m.ChannelID, "Set autoreact to: "+emojiIDsString)
-
-		err := serverconfig.Save(commands.SQLClient, m.GuildID, key, emojiIDsString)
-		if err != nil {
-			log.Println("SQL Error in set:", err)
-			return
-		}
-
-		return
-
-	default:
-		s.ChannelMessageSend(m.ChannelID, "Invalid key argument. "+usage)
-		return
 	}
 }
 
@@ -127,7 +57,8 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		s.ChannelMessageSend(m.ChannelID, usage)
 
 	case "autoreact":
-		c.configureAutoReact(s, m, parts)
+		const usage = "use the /autoreact command instead (admin only)"
+		s.ChannelMessageSend(m.ChannelID, usage)
 
 	case "twitter":
 		s.ChannelMessageSend(m.ChannelID, "twitter is dead")
