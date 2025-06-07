@@ -2,9 +2,9 @@ package twitchstreamannouncer
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -13,34 +13,15 @@ import (
 	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
 )
 
-var (
-	// Twitch User ID -> Live Status (true = online, false = offline)
-	streams = map[string]*streamState{}
-
-	streamsMutex = sync.Mutex{}
-)
-
-type streamState struct {
-	Live            bool
-	UserLogin       string
-	UserDisplayName string
-	Game            string
-	Title           string
-}
-
-func makeMessage(s *streamState) string {
+func makeMessage(s *helix.Stream) string {
 	if s == nil {
 		return "bad code"
 	}
 
-	if s.Live {
-		return fmt.Sprintf("%s is now live! https://twitch.tv/%s", s.UserDisplayName, s.UserLogin)
-	} else {
-		return fmt.Sprintf("%s has gone offline! https://twitch.tv/%s", s.UserDisplayName, s.UserLogin)
-	}
+	return fmt.Sprintf("%s is now live! https://twitch.tv/%s", s.UserName, s.UserLogin)
 }
 
-func Start(ctx context.Context, guildID string, helixClient *helix.Client, s *discordgo.Session) {
+func Start(ctx context.Context, guildID string, helixClient *helix.Client, s *discordgo.Session, sqlClient *sql.DB) {
 	ticker := time.NewTicker(5 * time.Second)
 	for {
 		select {
@@ -54,23 +35,18 @@ func Start(ctx context.Context, guildID string, helixClient *helix.Client, s *di
 				continue
 			}
 
-			nowOfflineStreamers, nowOnlineStreamers, err := checkForStreamChanges(guildID, helixClient)
+			nowOnlineStreamers, err := checkForStreamChanges(guildID, helixClient, sqlClient)
 			if err != nil {
 				fmt.Println("Error checking live status of streamers:", err)
 			} else {
 				if len(nowOnlineStreamers) > 0 {
 					for _, stream := range nowOnlineStreamers {
 						fmt.Printf("Send stream announce for %#v\n", stream)
-						_, err := s.ChannelMessageSend(streamAnnounceChannel, makeMessage(&stream))
+						_, err := s.ChannelMessageSend(streamAnnounceChannel, makeMessage(stream))
 						if err != nil {
+							// TODO: should we kill the sql entry if the message sending fails?
 							fmt.Println("Error sending stream announcement", err)
 						}
-					}
-				}
-				if len(nowOfflineStreamers) > 0 {
-					for _, stream := range nowOnlineStreamers {
-						fmt.Printf("Stream has gone offline %#v\n", stream)
-						// Currently don't announce, maybe option if someone asks xd
 					}
 				}
 			}
@@ -78,10 +54,8 @@ func Start(ctx context.Context, guildID string, helixClient *helix.Client, s *di
 	}
 }
 
-func checkForStreamChanges(guildID string, helixClient *helix.Client) (nowOfflineStreamers []streamState, nowOnlineStreamers []streamState, err error) {
+func checkForStreamChanges(guildID string, helixClient *helix.Client, sqlClient *sql.DB) (nowOnlineStreamers []*helix.Stream, err error) {
 	streamIDs := strings.Split(serverconfig.GetValue(guildID, "stream_ids"), ",")
-
-	// fmt.Println("Checking stream status of", streamIDs)
 
 	params := helix.StreamsParams{
 		UserIDs: streamIDs,
@@ -94,9 +68,6 @@ func checkForStreamChanges(guildID string, helixClient *helix.Client) (nowOfflin
 		return
 	}
 
-	streamsMutex.Lock()
-	defer streamsMutex.Unlock()
-
 	for _, twitchUserID := range streamIDs {
 		isLive := false
 		var matchingStream *helix.Stream
@@ -108,40 +79,36 @@ func checkForStreamChanges(guildID string, helixClient *helix.Client) (nowOfflin
 			}
 		}
 
-		prevState := streams[twitchUserID]
-		if prevState == nil {
-			// No previous state, never notify.
-			// This means we _could_ technically miss a going live notification if we have to restart bot right before a streamer goes live, but xD
-			prevState = &streamState{
-				Live:            false, // TODO: replace with isLive probably
-				UserLogin:       "",
-				UserDisplayName: "",
-				Game:            "",
-				Title:           "",
+		if isLive {
+			const query = `INSERT INTO twitchstreamannouncer (twitch_user_id, twitch_stream_id, discord_guild_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING;`
+			res, err := sqlClient.Exec(query, matchingStream.UserID, matchingStream.ID, guildID)
+			if err != nil {
+				return nil, err
 			}
 
-		}
+			rowsAffected, err := res.RowsAffected()
+			if err != nil {
+				return nil, err
+			}
+			if rowsAffected == 1 {
+				fmt.Printf("Stream %s has come online\n", twitchUserID)
+				nowOnlineStreamers = append(nowOnlineStreamers, matchingStream)
+			}
+		} else {
+			const query = `DELETE FROM twitchstreamannouncer WHERE twitch_user_id=$1 AND discord_guild_id=$2;`
+			res, err := sqlClient.Exec(query, twitchUserID, guildID)
+			if err != nil {
+				return nil, err
+			}
 
-		if matchingStream != nil {
-			prevState.Game = matchingStream.GameName
-			prevState.Title = matchingStream.Title
-			prevState.UserLogin = matchingStream.UserLogin
-			prevState.UserDisplayName = matchingStream.UserName
+			rowsAffected, err := res.RowsAffected()
+			if err != nil {
+				return nil, err
+			}
+			if rowsAffected == 1 {
+				fmt.Printf("Stream %s has gone offline\n", twitchUserID)
+			}
 		}
-
-		if !prevState.Live && isLive {
-			prevState.Live = true
-			// Stream just went live!
-			// fmt.Println("STREAM WENT LIVE", matchingStream)
-			nowOnlineStreamers = append(nowOnlineStreamers, *prevState)
-		} else if prevState.Live && !isLive {
-			prevState.Live = false
-			// Stream just went offline
-			// fmt.Println("STREAM WENT OFFLINE", matchingStream)
-			nowOfflineStreamers = append(nowOfflineStreamers, *prevState)
-		}
-
-		streams[twitchUserID] = prevState
 	}
 
 	return
