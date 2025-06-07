@@ -538,7 +538,7 @@ func main() {
 	bot.AddHandler(onMessageReactionRemoved)
 	bot.AddHandler(func(s *discordgo.Session, m *discordgo.GuildCreate) {
 		// Check streamer's live status occasionally and post it in the stream-status channel on updates
-		go twitchstreamannouncer.Start(ctx, m.Guild.ID, helixClient, bot)
+		go twitchstreamannouncer.Start(ctx, m.Guild.ID, helixClient, bot, sqlClient)
 	})
 	bot.AddHandler(func(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 		onMemberJoin(s, m, sqlClient)
