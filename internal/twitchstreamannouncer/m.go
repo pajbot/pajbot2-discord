@@ -93,8 +93,6 @@ func checkForStreamChanges(guildID string, helixClient *helix.Client, sqlClient 
 			if rowsAffected == 1 {
 				fmt.Printf("Stream %s has come online\n", twitchUserID)
 				nowOnlineStreamers = append(nowOnlineStreamers, matchingStream)
-			} else {
-				// fmt.Printf("Stream %s is online (but we already knew this)\n", twitchUserID)
 			}
 		} else {
 			const query = `DELETE FROM twitchstreamannouncer WHERE twitch_user_id=$1 AND discord_guild_id=$2;`
@@ -109,8 +107,6 @@ func checkForStreamChanges(guildID string, helixClient *helix.Client, sqlClient 
 			}
 			if rowsAffected == 1 {
 				fmt.Printf("Stream %s has gone offline\n", twitchUserID)
-			} else {
-				// fmt.Printf("Stream %s is offline (but we already knew this)\n", twitchUserID)
 			}
 		}
 	}
