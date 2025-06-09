@@ -22,6 +22,8 @@ func makeMessage(s *helix.Stream) string {
 }
 
 func Start(ctx context.Context, guildID string, helixClient *helix.Client, s *discordgo.Session, sqlClient *sql.DB) {
+	fmt.Println(guildID, "twitchstreamannouncer start")
+
 	ticker := time.NewTicker(5 * time.Second)
 	for {
 		select {
@@ -34,6 +36,8 @@ func Start(ctx context.Context, guildID string, helixClient *helix.Client, s *di
 			if streamAnnounceChannel == "" {
 				continue
 			}
+
+			fmt.Println(guildID, "twitchstreamannouncer tick")
 
 			nowOnlineStreamers, err := checkForStreamChanges(guildID, helixClient, sqlClient)
 			if err != nil {
@@ -63,16 +67,20 @@ func checkForStreamChanges(guildID string, helixClient *helix.Client, sqlClient 
 
 	var response *helix.StreamsResponse
 
+	fmt.Println(guildID, "Check for stream changes", streamIDs)
+
 	response, err = helixClient.GetStreams(&params)
 	if err != nil {
 		return
 	}
 
 	for _, twitchUserID := range streamIDs {
+		fmt.Println(guildID, "Seeing if stream was returned for", twitchUserID)
 		isLive := false
 		var matchingStream *helix.Stream
 		for _, stream := range response.Data.Streams {
 			if stream.UserID == twitchUserID {
+				fmt.Println(guildID, "Stream did exist", twitchUserID)
 				isLive = true
 				matchingStream = &stream
 				break
@@ -91,7 +99,7 @@ func checkForStreamChanges(guildID string, helixClient *helix.Client, sqlClient 
 				return nil, err
 			}
 			if rowsAffected == 1 {
-				fmt.Printf("Stream %s has come online\n", twitchUserID)
+				fmt.Printf("[%s] Stream %s has come online\n", guildID, twitchUserID)
 				nowOnlineStreamers = append(nowOnlineStreamers, matchingStream)
 			}
 		} else {
@@ -106,7 +114,7 @@ func checkForStreamChanges(guildID string, helixClient *helix.Client, sqlClient 
 				return nil, err
 			}
 			if rowsAffected == 1 {
-				fmt.Printf("Stream %s has gone offline\n", twitchUserID)
+				fmt.Printf("[%s] Stream %s has gone offline\n", guildID, twitchUserID)
 			}
 		}
 	}
