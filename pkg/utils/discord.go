@@ -142,7 +142,7 @@ func CreationTime(ID string) (t time.Time, err error) {
 	return
 }
 
-var inviteRegex = regexp.MustCompile(`(?i)discord(?:(?:app)?\.com\/invite|\.gg(?:\/invite)?)\/([\w-]{2,255})`)
+var inviteRegex = regexp.MustCompile(`(?i)discord(?:(?:app)?\.com\/invite|\.gg(?:\/invite)?)(\/|\\)([\w-]{2,255})`)
 
 func ResolveInviteCode(content string) (inviteCode string, ok bool) {
 	matches := inviteRegex.FindStringSubmatch(content)
