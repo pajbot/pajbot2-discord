@@ -529,6 +529,8 @@ func main() {
 	// app.filterRunner.OnBan(...)
 	// app.filterRunner.OnMute(...)
 
+	go twitchstreamannouncer.Start(ctx, helixClient, bot, sqlClient)
+
 	bot.AddHandler(app.onMessage)
 	bot.AddHandler(onMessageDeleted)
 	bot.AddHandler(app.onMessageEdited)
@@ -538,7 +540,7 @@ func main() {
 	bot.AddHandler(onMessageReactionRemoved)
 	bot.AddHandler(func(s *discordgo.Session, m *discordgo.GuildCreate) {
 		// Check streamer's live status occasionally and post it in the stream-status channel on updates
-		go twitchstreamannouncer.Start(ctx, m.Guild.ID, helixClient, bot, sqlClient)
+		twitchstreamannouncer.Register(m.Guild.ID)
 	})
 	bot.AddHandler(func(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 		onMemberJoin(s, m, sqlClient)
