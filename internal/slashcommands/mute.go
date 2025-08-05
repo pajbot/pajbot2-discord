@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/pajbot/pajbot2-discord/internal/commands/mute"
+	"github.com/pajbot/pajbot2-discord/internal/mute"
 )
 
 func init() {
@@ -71,7 +71,7 @@ func init() {
 				return
 			}
 
-			if message, err := mute.Execute(s, i.GuildID, moderator, userToMute, muteDuration, muteReason); err != nil {
+			if message, err := mute.MuteUser(sqlClient, s, i.GuildID, moderator, userToMute, muteDuration, muteReason); err != nil {
 				fmt.Println("Error executing mute:", err)
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
