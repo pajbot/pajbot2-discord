@@ -1217,11 +1217,7 @@ func onMessageReactionRemoved(s *discordgo.Session, m *discordgo.MessageReaction
 	}
 }
 
-func onMemberJoin(s *discordgo.Session, m *discordgo.GuildMemberAdd, sqlClient *sql.DB) {
-	err := mute.ReapplyMute(s, sqlClient, m)
-	if err != nil {
-		fmt.Println("Error when seeing if we need to reapply mute:", err)
-	}
+func handleMemberJoin(s *discordgo.Session, m *discordgo.GuildMemberAdd, sqlClient *sql.DB) {
 
 	fields := []discordgo.MessageEmbedField{}
 
@@ -1302,6 +1298,19 @@ func onMemberJoin(s *discordgo.Session, m *discordgo.GuildMemberAdd, sqlClient *
 	}
 
 	postUserInfo(s, m.Member, "User Joined", fields)
+}
+
+func onMemberJoin(s *discordgo.Session, m *discordgo.GuildMemberAdd, sqlClient *sql.DB) {
+	err := mute.ReapplyMute(s, sqlClient, m)
+	if err != nil {
+		fmt.Println("Error when seeing if we need to reapply mute:", err)
+	}
+
+	go func() {
+		randomSeconds := 2 + rand.Intn(8)
+		time.Sleep(time.Duration(randomSeconds) * time.Second)
+		handleMemberJoin(s, m, sqlClient)
+	}()
 
 	// banIfUserIsYoungerThan(s, m, 1*time.Hour)
 
