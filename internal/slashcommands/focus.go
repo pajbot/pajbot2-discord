@@ -14,12 +14,12 @@ func init() {
 		name: "focus",
 
 		command: &discordgo.ApplicationCommand{
-			Description: "🧘 Mute yourself to enter peace mode. Silence distractions, clear your mind.",
+			Description: "🧘 Enter peace mode. Silence distractions, clear your mind.",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
 					Name:        "duration",
-					Description: "Mute duration",
+					Description: "How long to mute yourself for",
 					Required:    true,
 					Choices: []*discordgo.ApplicationCommandOptionChoice{
 						{
@@ -86,7 +86,7 @@ func init() {
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
-						Content: "You are already self-muted dummy, no takesies backsies",
+						Content: "You are already muted dummy, no takesies backsies",
 					},
 				})
 				return
@@ -95,7 +95,7 @@ func init() {
 			options := i.ApplicationCommandData().Options
 			muteDuration := options[0].StringValue()
 
-			if duration, err := mute.MuteUser(sqlClient, s, i.GuildID, s.State.User, executingUser, muteDuration, mute.SelfMuteReason); err != nil {
+			if duration, err := mute.MuteUser(sqlClient, s, i.GuildID, executingUser, muteDuration, mute.FocusMuteReason); err != nil {
 				fmt.Println("Error executing self-mute:", err)
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -119,6 +119,8 @@ func init() {
 				if targetChannel != "" {
 					// Announce self-mute in action-log channel
 					s.ChannelMessageSend(targetChannel, message)
+				} else {
+					fmt.Println("Unable to announce focus mode since no action-log channel is set up")
 				}
 			}
 		},

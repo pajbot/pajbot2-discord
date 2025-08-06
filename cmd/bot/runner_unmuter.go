@@ -39,7 +39,7 @@ func startUnmuterRunner(ctx context.Context, bot *discordgo.Session) {
 				resultMessage := fmt.Sprintf(resultFormat, utils.MentionMember(member), utils.EscapeMarkdown(unmutedUser.Reason))
 
 				var targetChannel string
-				if unmutedUser.Reason == mute.SelfMuteReason {
+				if unmutedUser.Reason == mute.FocusMuteReason {
 					targetChannel = channels.Get(unmutedUser.GuildID, "action-log")
 				} else {
 					targetChannel = serverconfig.Get(unmutedUser.GuildID, "channel:moderation-action")

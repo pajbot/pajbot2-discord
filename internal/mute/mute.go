@@ -8,7 +8,6 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/pajbot2-discord/internal/roles"
-	"github.com/pajbot/pajbot2-discord/pkg/utils"
 	pb2utils "github.com/pajbot/utils"
 )
 
@@ -19,19 +18,13 @@ type MutedUser struct {
 	Reason  string
 }
 
-const SelfMuteReason = "focus-mode-self-mute"
+// FocusMuteReason is the hardcoded reason for focus mode mutes. This is used to be able to differentiate between moderator mutes and focus mutes.
+const FocusMuteReason = "focus-mode-self-mute"
 
-func MuteUser(sqlClient *sql.DB, s *discordgo.Session, guildID string, moderator *discordgo.User, target *discordgo.User, durationString, reason string) (time.Duration, error) {
-	var duration time.Duration
-
-	hasAccess, err := utils.MemberHasPermission(s, guildID, moderator.ID, "minimod")
-	if err != nil {
-		return duration, fmt.Errorf("permission error: %w", err)
-	}
-	if !hasAccess {
-		return duration, fmt.Errorf("you don't have permission to use this command")
-	}
-
+// MuteUser performs a mute by granting the target user the muted role, and registering the mute in the database.
+//
+// The permission check and announcing of the mute needs to be done by the caller.
+func MuteUser(sqlClient *sql.DB, s *discordgo.Session, guildID string, target *discordgo.User, durationString, reason string) (duration time.Duration, err error) {
 	mutedRole := roles.GetSingle(guildID, "muted")
 	if mutedRole == "" {
 		return duration, fmt.Errorf("no muted role has been assigned")

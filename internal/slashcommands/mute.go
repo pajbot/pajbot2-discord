@@ -73,7 +73,27 @@ func init() {
 				return
 			}
 
-			if duration, err := mute.MuteUser(sqlClient, s, i.GuildID, moderator, userToMute, muteDuration, muteReason); err != nil {
+			hasAccess, err := utils.MemberHasPermission(s, i.GuildID, moderator.ID, "minimod")
+			if err != nil {
+				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: "error checking /mute perms:" + err.Error(),
+					},
+				})
+				return
+			}
+			if !hasAccess {
+				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: "you don't have permission to use this command",
+					},
+				})
+				return
+			}
+
+			if duration, err := mute.MuteUser(sqlClient, s, i.GuildID, userToMute, muteDuration, muteReason); err != nil {
 				fmt.Println("Error executing mute:", err)
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
