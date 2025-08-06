@@ -95,7 +95,7 @@ func init() {
 			options := i.ApplicationCommandData().Options
 			muteDuration := options[1].StringValue()
 
-			if _, err := mute.MuteUser(sqlClient, s, i.GuildID, s.State.User, executingUser, muteDuration, mute.SelfMuteReason); err != nil {
+			if _, duration, err := mute.MuteUser(sqlClient, s, i.GuildID, s.State.User, executingUser, muteDuration, mute.SelfMuteReason); err != nil {
 				fmt.Println("Error executing self-mute:", err)
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -108,12 +108,12 @@ func init() {
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
-						Content: "Inner peace obtained for " + muteDuration,
+						Content: "Inner peace obtained for " + duration.String(),
 					},
 				})
 
 				const resultFormat = "%s self-muted for %s"
-				message := fmt.Sprintf(resultFormat, utils.MentionUser(s, i.GuildID, executingUser), muteDuration)
+				message := fmt.Sprintf(resultFormat, utils.MentionUser(s, i.GuildID, executingUser), duration)
 
 				targetChannel := channels.Get(i.GuildID, "action-log")
 				if targetChannel != "" {

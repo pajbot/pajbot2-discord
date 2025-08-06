@@ -4,7 +4,9 @@ import (
 	"fmt"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/pajbot/pajbot2-discord/internal/channels"
 	"github.com/pajbot/pajbot2-discord/internal/mute"
+	"github.com/pajbot/pajbot2-discord/pkg/utils"
 )
 
 func init() {
@@ -71,7 +73,7 @@ func init() {
 				return
 			}
 
-			if message, err := mute.MuteUser(sqlClient, s, i.GuildID, moderator, userToMute, muteDuration, muteReason); err != nil {
+			if message, duration, err := mute.MuteUser(sqlClient, s, i.GuildID, moderator, userToMute, muteDuration, muteReason); err != nil {
 				fmt.Println("Error executing mute:", err)
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -87,6 +89,15 @@ func init() {
 						Content: message,
 					},
 				})
+
+				const resultFormat = "%s muted %s for %s. reason: %s"
+				message = fmt.Sprintf(resultFormat, utils.MentionUser(s, i.GuildID, moderator), utils.MentionUser(s, i.GuildID, userToMute), duration, muteReason)
+
+				targetChannel := channels.Get(i.GuildID, "moderation-action")
+				if targetChannel != "" {
+					// Announce mute in moderation-action channel
+					s.ChannelMessageSend(targetChannel, message)
+				}
 			}
 		},
 	}
