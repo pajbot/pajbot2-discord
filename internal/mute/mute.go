@@ -8,6 +8,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/pajbot2-discord/internal/roles"
+	pb2utils "github.com/pajbot/utils"
 )
 
 // MutedUser describes a user that is/was muted
@@ -15,6 +16,47 @@ type MutedUser struct {
 	UserID  string
 	GuildID string
 	Reason  string
+}
+
+// FocusMuteReason is the hardcoded reason for focus mode mutes. This is used to be able to differentiate between moderator mutes and focus mutes.
+const FocusMuteReason = "focus-mode-self-mute"
+
+// MuteUser performs a mute by granting the target user the muted role, and registering the mute in the database.
+//
+// The permission check and announcing of the mute needs to be done by the caller.
+func MuteUser(sqlClient *sql.DB, s *discordgo.Session, guildID string, target *discordgo.User, durationString, reason string) (duration time.Duration, err error) {
+	mutedRole := roles.GetSingle(guildID, "muted")
+	if mutedRole == "" {
+		return duration, fmt.Errorf("no muted role has been assigned")
+	}
+
+	duration, err = pb2utils.ParseDuration(durationString)
+	if err != nil {
+		return duration, fmt.Errorf("invalid duration: %w", err)
+	}
+
+	if duration < 1*time.Minute {
+		duration = 1 * time.Minute
+	} else if duration > 14*24*time.Hour {
+		duration = 14 * 24 * time.Hour
+	}
+
+	// Create queued up unmute action in database
+	muteEnd := time.Now().Add(duration)
+
+	query := "INSERT INTO discord_mutes (guild_id, user_id, reason, mute_start, mute_end) VALUES ($1, $2, $3, NOW(), $4) ON CONFLICT (guild_id, user_id) DO UPDATE SET reason=$3, mute_end=$4"
+	_, err = sqlClient.Exec(query, guildID, target.ID, reason, muteEnd)
+	if err != nil {
+		return duration, fmt.Errorf("sql error: %w", err)
+	}
+
+	// Assign muted role
+	err = s.GuildMemberRoleAdd(guildID, target.ID, mutedRole)
+	if err != nil {
+		return duration, fmt.Errorf("error assigning muted role %w", err)
+	}
+
+	return duration, nil
 }
 
 // IsUserMuted check if there's a mute active for the given user in the given server
