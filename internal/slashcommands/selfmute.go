@@ -95,7 +95,7 @@ func init() {
 			options := i.ApplicationCommandData().Options
 			muteDuration := options[0].StringValue()
 
-			if _, duration, err := mute.MuteUser(sqlClient, s, i.GuildID, s.State.User, executingUser, muteDuration, mute.SelfMuteReason); err != nil {
+			if duration, err := mute.MuteUser(sqlClient, s, i.GuildID, s.State.User, executingUser, muteDuration, mute.SelfMuteReason); err != nil {
 				fmt.Println("Error executing self-mute:", err)
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,

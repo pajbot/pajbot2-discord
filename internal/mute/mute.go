@@ -21,26 +21,25 @@ type MutedUser struct {
 
 const SelfMuteReason = "focus-mode-self-mute"
 
-func MuteUser(sqlClient *sql.DB, s *discordgo.Session, guildID string, moderator *discordgo.User, target *discordgo.User, durationString, reason string) (string, time.Duration, error) {
+func MuteUser(sqlClient *sql.DB, s *discordgo.Session, guildID string, moderator *discordgo.User, target *discordgo.User, durationString, reason string) (time.Duration, error) {
 	var duration time.Duration
-	message := ""
 
 	hasAccess, err := utils.MemberHasPermission(s, guildID, moderator.ID, "minimod")
 	if err != nil {
-		return message, duration, fmt.Errorf("permission error: %w", err)
+		return duration, fmt.Errorf("permission error: %w", err)
 	}
 	if !hasAccess {
-		return message, duration, fmt.Errorf("you don't have permission to use this command")
+		return duration, fmt.Errorf("you don't have permission to use this command")
 	}
 
 	mutedRole := roles.GetSingle(guildID, "muted")
 	if mutedRole == "" {
-		return message, duration, fmt.Errorf("no muted role has been assigned")
+		return duration, fmt.Errorf("no muted role has been assigned")
 	}
 
 	duration, err = pb2utils.ParseDuration(durationString)
 	if err != nil {
-		return message, duration, fmt.Errorf("invalid duration: %w", err)
+		return duration, fmt.Errorf("invalid duration: %w", err)
 	}
 
 	if duration < 1*time.Minute {
@@ -55,16 +54,16 @@ func MuteUser(sqlClient *sql.DB, s *discordgo.Session, guildID string, moderator
 	query := "INSERT INTO discord_mutes (guild_id, user_id, reason, mute_start, mute_end) VALUES ($1, $2, $3, NOW(), $4) ON CONFLICT (guild_id, user_id) DO UPDATE SET reason=$3, mute_end=$4"
 	_, err = sqlClient.Exec(query, guildID, target.ID, reason, muteEnd)
 	if err != nil {
-		return message, duration, fmt.Errorf("sql error: %w", err)
+		return duration, fmt.Errorf("sql error: %w", err)
 	}
 
 	// Assign muted role
 	err = s.GuildMemberRoleAdd(guildID, target.ID, mutedRole)
 	if err != nil {
-		return message, duration, fmt.Errorf("error assigning muted role %w", err)
+		return duration, fmt.Errorf("error assigning muted role %w", err)
 	}
 
-	return message, duration, nil
+	return duration, nil
 }
 
 // IsUserMuted check if there's a mute active for the given user in the given server

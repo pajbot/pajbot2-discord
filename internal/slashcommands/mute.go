@@ -73,7 +73,7 @@ func init() {
 				return
 			}
 
-			if message, duration, err := mute.MuteUser(sqlClient, s, i.GuildID, moderator, userToMute, muteDuration, muteReason); err != nil {
+			if duration, err := mute.MuteUser(sqlClient, s, i.GuildID, moderator, userToMute, muteDuration, muteReason); err != nil {
 				fmt.Println("Error executing mute:", err)
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -82,16 +82,18 @@ func init() {
 					},
 				})
 			} else {
-				fmt.Println("Mute success")
-				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				const resultFormat = "%s muted %s for %s. reason: %s"
+				message := fmt.Sprintf(resultFormat, utils.MentionUser(s, i.GuildID, moderator), utils.MentionUser(s, i.GuildID, userToMute), duration, muteReason)
+				fmt.Println(message)
+				err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
 						Content: message,
 					},
 				})
-
-				const resultFormat = "%s muted %s for %s. reason: %s"
-				message = fmt.Sprintf(resultFormat, utils.MentionUser(s, i.GuildID, moderator), utils.MentionUser(s, i.GuildID, userToMute), duration, muteReason)
+				if err != nil {
+					fmt.Println("Error responding with interaction:", err)
+				}
 
 				targetChannel := channels.Get(i.GuildID, "moderation-action")
 				if targetChannel != "" {
