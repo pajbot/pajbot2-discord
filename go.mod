@@ -1,6 +1,6 @@
 module github.com/pajbot/pajbot2-discord
 
-go 1.23.0
+go 1.24.0
 
 require (
 	github.com/bwmarrin/discordgo v0.29.0
@@ -13,7 +13,7 @@ require (
 	github.com/pajbot/utils v1.0.0
 	github.com/pajlada/lidl-normalize v1.0.0
 	github.com/pajlada/stupidmigration v0.1.0
-	golang.org/x/oauth2 v0.30.0
+	golang.org/x/oauth2 v0.31.0
 	honnef.co/go/tools v0.6.1
 )
 
