@@ -93,6 +93,10 @@ func init() {
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
+					AllowedMentions: &discordgo.MessageAllowedMentions{
+						Users: []string{executingUser.ID},
+						Roles: []string{roleToMention.ID},
+					},
 					Content: fmt.Sprintf("*from %s to %s*\n %s", utils.MentionUser(s, i.GuildID, executingUser), roleToMention.Mention(), message),
 				},
 			})
