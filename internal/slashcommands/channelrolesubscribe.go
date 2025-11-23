@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/pajbot/pajbot2-discord/internal/channelrole"
 	"github.com/pajbot/pajbot2-discord/pkg/utils"
 )
 
@@ -31,11 +32,11 @@ func init() {
 			} else if i.User != nil {
 				executingUser = i.User
 			} else {
-				fmt.Println("no user found for self-mute?")
+				fmt.Println("No user found for subscribe?")
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
-						Content: "no user found for self-mute?",
+						Content: "No user found for subscribe?",
 					},
 				})
 				return
@@ -71,7 +72,20 @@ func init() {
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
 						Flags:   discordgo.MessageFlagsEphemeral,
-						Content: "you are already subscribed to this role",
+						Content: "You are already subscribed to this role",
+					},
+				})
+				return
+			}
+
+			// Check if the role is a channel topic role, otherwise we won't allow them to subscribe to it.
+			isChannelRole, _ := channelrole.IsChannelRole(i.GuildID, roleToSubscribe.ID)
+			if !isChannelRole {
+				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Flags:   discordgo.MessageFlagsEphemeral,
+						Content: "This role is not a channel topic role",
 					},
 				})
 				return
