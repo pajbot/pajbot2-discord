@@ -63,7 +63,7 @@ func init() {
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
 						Flags:   discordgo.MessageFlagsEphemeral,
-						Content: "error deleting channel role:" + err.Error(),
+						Content: "Error deleting channel role:" + err.Error(),
 					},
 				})
 			}
@@ -74,7 +74,7 @@ func init() {
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
 						Flags:   discordgo.MessageFlagsEphemeral,
-						Content: "error deleting channel role:" + err.Error(),
+						Content: "Error deleting channel role:" + err.Error(),
 					},
 				})
 			}

@@ -38,11 +38,11 @@ func init() {
 			} else if i.User != nil {
 				executingUser = i.User
 			} else {
-				fmt.Println("no user found for at comnmand")
+				fmt.Println("No user found for at command")
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
-						Content: "no user found for at command",
+						Content: "No user found for at command",
 					},
 				})
 				return
@@ -56,7 +56,7 @@ func init() {
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
-						Content: "an invalid role was passed to the at command",
+						Content: "An invalid role was passed to the at command",
 					},
 				})
 				return
@@ -66,7 +66,7 @@ func init() {
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
-						Content: "an invalid message was passed to the at command",
+						Content: "An invalid message was passed to the at command",
 					},
 				})
 				return

@@ -39,11 +39,11 @@ func init() {
 			} else if i.User != nil {
 				moderator = i.User
 			} else {
-				fmt.Println("no moderator found?")
+				fmt.Println("No moderator found?")
 				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
-						Content: "no moderator found?",
+						Content: "No moderator found?",
 					},
 				})
 				return
@@ -59,7 +59,7 @@ func init() {
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
 						Flags:   discordgo.MessageFlagsEphemeral,
-						Content: "an invalid name was passed to the create channel role command",
+						Content: "An invalid name was passed to the create channel role command",
 					},
 				})
 				return
@@ -70,7 +70,7 @@ func init() {
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
 						Flags:   discordgo.MessageFlagsEphemeral,
-						Content: "an invalid channel was passed to the create channel role command",
+						Content: "An invalid channel was passed to the create channel role command",
 					},
 				})
 				return
@@ -85,7 +85,7 @@ func init() {
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
 						Flags:   discordgo.MessageFlagsEphemeral,
-						Content: "an invalid channel was passed to the create channel role command",
+						Content: "An invalid channel was passed to the create channel role command",
 					},
 				})
 				return
@@ -97,7 +97,7 @@ func init() {
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
 						Flags:   discordgo.MessageFlagsEphemeral,
-						Content: "error creating channel role:" + err.Error(),
+						Content: "Error creating channel role:" + err.Error(),
 					},
 				})
 				return
