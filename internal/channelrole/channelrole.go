@@ -94,10 +94,21 @@ func UpdateLastInvoked(s *discordgo.Session, user *discordgo.User, guildID strin
 	}
 
 	message := fmt.Sprintf("Channel role %s (%s) invoked by %s", roleName, roleID, utils.MentionUser(s, guildID, user))
-
 	s.ChannelMessageSend(targetChannel, message)
 
 	return nil
+}
+
+func IsChannelRole(guildID string, roleID string) (isChannelRole bool, errorMessage string) {
+	const query = "SELECT COUNT(*) FROM channel_topic_roles WHERE role_id=$1 AND guild_id=$2"
+
+	var count int
+	err := commands.SQLClient.QueryRow(query, roleID, guildID).Scan(&count)
+	if err != nil {
+		return false, err.Error()
+	}
+
+	return count == 1, ""
 }
 
 func Create(s *discordgo.Session, moderator *discordgo.User, guildID string, channelID string, roleID string, roleName string) error {
