@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/jessevdk/go-flags v1.6.1
-	github.com/lib/pq v1.10.9
+	github.com/lib/pq v1.11.1
 	github.com/nicklaw5/helix v1.25.0
 	github.com/pajbot/basecommand v1.0.0
 	github.com/pajbot/commandmatcher v1.0.1
