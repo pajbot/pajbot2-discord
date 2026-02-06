@@ -13,7 +13,7 @@ require (
 	github.com/pajbot/utils v1.0.0
 	github.com/pajlada/lidl-normalize v1.0.0
 	github.com/pajlada/stupidmigration v0.1.0
-	golang.org/x/oauth2 v0.33.0
+	golang.org/x/oauth2 v0.34.0
 	honnef.co/go/tools v0.6.1
 )
 
