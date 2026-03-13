@@ -56,7 +56,7 @@ func init() {
 }
 
 func handleClearWritePerms(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	const dryRun = true
+	const dryRun = false
 
 	channel, err := s.Channel(i.ChannelID)
 	if err != nil {
@@ -83,6 +83,7 @@ func handleClearWritePerms(s *discordgo.Session, i *discordgo.InteractionCreate)
 			if dryRun {
 				fmt.Println("Would have removed send message perms from", overwrite.ID)
 			} else {
+				fmt.Println("Removing channel send message perms from", overwrite.ID)
 				err := s.ChannelPermissionSet(channel.ID, overwrite.ID, overwrite.Type, newAllow, overwrite.Deny)
 				if err != nil {
 					fmt.Printf("Error updating permission for %s: %v\n", overwrite.ID, err)
