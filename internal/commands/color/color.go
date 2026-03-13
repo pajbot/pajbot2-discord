@@ -61,7 +61,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 
 	if color == "reset" {
 		colorRoles := utils.ColorRoles(s, m.GuildID)
-		err := utils.RemoveNitroColors(s, m.GuildID, m.Author.ID, colorRoles)
+		_, err := utils.RemoveNitroColors(s, m.GuildID, m.Author.ID, colorRoles)
 		if err != nil {
 			s.ChannelMessageSend(m.ChannelID, "Error removing nitro roles: "+err.Error())
 		}
@@ -80,7 +80,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		return
 	}
 
-	err = utils.RemoveNitroColors(s, m.GuildID, m.Author.ID, colorRoles)
+	_, err = utils.RemoveNitroColors(s, m.GuildID, m.Author.ID, colorRoles)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, "Error removing previous nitro roles: "+err.Error())
 	}

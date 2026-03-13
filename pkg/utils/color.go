@@ -27,23 +27,26 @@ func ColorRoles(s *discordgo.Session, guildID string) (colorRoles []*discordgo.R
 	return FilterColorRoles(roles)
 }
 
-func RemoveNitroColors(s *discordgo.Session, guildID, userID string, colorRoles []*discordgo.Role) error {
+func RemoveNitroColors(s *discordgo.Session, guildID, userID string, colorRoles []*discordgo.Role) (bool, error) {
 	member, err := s.GuildMember(guildID, userID)
 	if err != nil {
-		return err
+		return false, err
 	}
+
+	anyRemoved := false
 
 	// Remove all nitro roles from user
 	for _, role := range colorRoles {
 		for _, memberRoleID := range member.Roles {
 			if role.ID == memberRoleID {
+				anyRemoved = true
 				err = s.GuildMemberRoleRemove(guildID, userID, role.ID)
 				if err != nil {
-					return err
+					return false, err
 				}
 			}
 		}
 	}
 
-	return nil
+	return anyRemoved, nil
 }
