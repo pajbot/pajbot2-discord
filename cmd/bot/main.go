@@ -881,6 +881,12 @@ func (a *App) onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) 
 		Value:  "<#" + m.ChannelID + ">",
 		Inline: true,
 	})
+	idTime, idTimeErr := discordgo.SnowflakeTimestamp(m.ID)
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "Snowflake/ID",
+		Value:  fmt.Sprintf("%s: %s %s", m.ID, idTime, idTimeErr),
+		Inline: true,
+	})
 	s.ChannelMessageSendEmbed(targetChannel, embed)
 
 	err = pushMessageIntoDatabase(m.Message)
