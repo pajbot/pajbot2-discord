@@ -1306,7 +1306,7 @@ func handleMemberJoin(s *discordgo.Session, m *discordgo.GuildMemberAdd, sqlClie
 						fmt.Println("Something went wrong DMing", m.User.ID, err)
 						fields = append(fields, discordgo.MessageEmbedField{
 							Name:   "Error",
-							Value:  "Failed to send DM",
+							Value:  fmt.Sprintf("Failed to send DM (Connection URL was `%s` was)", connectionURL),
 							Inline: false,
 						})
 					} else {
