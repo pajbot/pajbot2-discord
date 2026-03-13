@@ -650,6 +650,17 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
+	if m.GuildID == forsenServerID {
+		if strings.Contains(m.Message.Content, "bajscran") {
+			if err := s.MessageReactionAdd(m.ChannelID, m.ID, "⬅️"); err != nil {
+				fmt.Println("error adding left:", err)
+			}
+			if err := s.MessageReactionAdd(m.ChannelID, m.ID, "➡️"); err != nil {
+				fmt.Println("error adding right:", err)
+			}
+		}
+	}
+
 	if inviteCode, ok := utils.ResolveInviteCode(m.Message.Content); ok && inviteCode != "forsen" {
 		hasAccess, err := utils.MemberInRoles(s, m.GuildID, m.Author.ID, "minimod")
 		if err != nil {
