@@ -639,7 +639,26 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Remove nitro colors if the user doesn't have nitro
 	if hasAccess, _ := utils.MemberInRoles(s, m.GuildID, m.Author.ID, "nitrobooster"); !hasAccess {
 		colorRoles := utils.ColorRoles(s, m.GuildID)
-		utils.RemoveNitroColors(s, m.GuildID, m.Author.ID, colorRoles)
+		messageTimestamp, messageTimestampErr := discordgo.SnowflakeTimestamp(m.Message.ID)
+		anyRemoved, err := utils.RemoveNitroColors(s, m.GuildID, m.Author.ID, colorRoles)
+		if err != nil {
+			fmt.Println("Error Removing nitro from", m.Author.ID, messageTimestamp, messageTimestampErr, err)
+		} else {
+			if anyRemoved {
+				fmt.Println("Removing nitro from", m.Author.ID, messageTimestamp, messageTimestampErr)
+			}
+		}
+	}
+
+	if m.GuildID == forsenServerID {
+		if strings.Contains(m.Message.Content, "bajscran") {
+			if err := s.MessageReactionAdd(m.ChannelID, m.ID, "⬅️"); err != nil {
+				fmt.Println("error adding left:", err)
+			}
+			if err := s.MessageReactionAdd(m.ChannelID, m.ID, "➡️"); err != nil {
+				fmt.Println("error adding right:", err)
+			}
+		}
 	}
 
 	if inviteCode, ok := utils.ResolveInviteCode(m.Message.Content); ok && inviteCode != "forsen" {
@@ -860,6 +879,12 @@ func (a *App) onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) 
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 		Name:   "Channel",
 		Value:  "<#" + m.ChannelID + ">",
+		Inline: true,
+	})
+	idTime, idTimeErr := discordgo.SnowflakeTimestamp(m.ID)
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "Snowflake/ID",
+		Value:  fmt.Sprintf("%s: %s %s", m.ID, idTime, idTimeErr),
 		Inline: true,
 	})
 	s.ChannelMessageSendEmbed(targetChannel, embed)
@@ -1281,7 +1306,7 @@ func handleMemberJoin(s *discordgo.Session, m *discordgo.GuildMemberAdd, sqlClie
 						fmt.Println("Something went wrong DMing", m.User.ID, err)
 						fields = append(fields, discordgo.MessageEmbedField{
 							Name:   "Error",
-							Value:  "Failed to send DM",
+							Value:  fmt.Sprintf("Failed to send DM (Connection URL was `%s` was)", connectionURL),
 							Inline: false,
 						})
 					} else {
