@@ -639,7 +639,15 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Remove nitro colors if the user doesn't have nitro
 	if hasAccess, _ := utils.MemberInRoles(s, m.GuildID, m.Author.ID, "nitrobooster"); !hasAccess {
 		colorRoles := utils.ColorRoles(s, m.GuildID)
-		utils.RemoveNitroColors(s, m.GuildID, m.Author.ID, colorRoles)
+		messageTimestamp, messageTimestampErr := discordgo.SnowflakeTimestamp(m.Message.ID)
+		anyRemoved, err := utils.RemoveNitroColors(s, m.GuildID, m.Author.ID, colorRoles)
+		if err != nil {
+			fmt.Println("Error Removing nitro from", m.Author.ID, messageTimestamp, messageTimestampErr, err)
+		} else {
+			if anyRemoved {
+				fmt.Println("Removing nitro from", m.Author.ID, messageTimestamp, messageTimestampErr)
+			}
+		}
 	}
 
 	if inviteCode, ok := utils.ResolveInviteCode(m.Message.Content); ok && inviteCode != "forsen" {
