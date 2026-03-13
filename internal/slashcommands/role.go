@@ -2,6 +2,7 @@ package slashcommands
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/pajbot2-discord/internal/roles"
@@ -156,24 +157,24 @@ func roleClear(s *discordgo.Session, i *discordgo.InteractionCreate, options []*
 }
 
 func roleList(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	response := ""
+	var response strings.Builder
 	first := true
 
 	for role := range roles.List() {
 		if !first {
-			response += "\n"
+			response.WriteString("\n")
 		}
 
 		discordRoleID := roles.GetSingle(i.GuildID, role.Name)
 
-		response += formatRole(role.Name, discordRoleID)
+		response.WriteString(formatRole(role.Name, discordRoleID))
 
 		first = false
 	}
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: response,
+			Content: response.String(),
 		},
 	})
 }
