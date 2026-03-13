@@ -120,7 +120,7 @@ func autoreactSet(s *discordgo.Session, i *discordgo.InteractionCreate, options 
 		emojiString := options[1].StringValue()
 		sanitizedEmojis := []string{}
 
-		for _, emoji := range strings.Split(emojiString, " ") {
+		for emoji := range strings.SplitSeq(emojiString, " ") {
 			v := strings.TrimSpace(emoji)
 			if v == "" {
 				continue

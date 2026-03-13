@@ -19,6 +19,6 @@ func Register(aliases []string, command pkg.Command) {
 	c.Register(aliases, command)
 }
 
-func Match(text string) (interface{}, []string) {
+func Match(text string) (any, []string) {
 	return c.Match(text)
 }

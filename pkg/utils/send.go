@@ -78,11 +78,11 @@ func DeleteChunks(s *discordgo.Session, channelID string, messageIDs []string) (
 	return
 }
 
-func Reply(s *discordgo.Session, m *discordgo.MessageCreate, format string, args ...interface{}) error {
+func Reply(s *discordgo.Session, m *discordgo.MessageCreate, format string, args ...any) error {
 	return ReplyAuthor(s, m.ChannelID, m.Author, format, args...)
 }
 
-func ReplyAuthor(s *discordgo.Session, channelID string, author *discordgo.User, format string, args ...interface{}) error {
+func ReplyAuthor(s *discordgo.Session, channelID string, author *discordgo.User, format string, args ...any) error {
 	r := fmt.Sprintf(format, args...)
 
 	_, err := s.ChannelMessageSend(channelID, author.Mention()+", "+r)

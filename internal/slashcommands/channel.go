@@ -2,6 +2,7 @@ package slashcommands
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/pajbot2-discord/internal/channels"
@@ -203,24 +204,24 @@ func channelClear(s *discordgo.Session, i *discordgo.InteractionCreate, options 
 }
 
 func channelList(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	response := ""
+	var response strings.Builder
 	first := true
 
 	for channel := range channels.List() {
 		if !first {
-			response += "\n"
+			response.WriteString("\n")
 		}
 
 		discordChannelID := channels.Get(i.GuildID, channel.Name)
 
-		response += formatChannel(channel.Name, discordChannelID)
+		response.WriteString(formatChannel(channel.Name, discordChannelID))
 
 		first = false
 	}
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: response,
+			Content: response.String(),
 		},
 	})
 }

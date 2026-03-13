@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"time"
 
@@ -64,10 +65,8 @@ func MemberInRoles(s *discordgo.Session, guildID, userID, role string) (bool, er
 		if err != nil {
 			return false, err
 		}
-		for _, tRole := range roles {
-			if role.ID == tRole {
-				return true, nil
-			}
+		if slices.Contains(roles, role.ID) {
+			return true, nil
 		}
 	}
 
