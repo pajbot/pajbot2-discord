@@ -1004,7 +1004,7 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 	if authorID != "unknown" {
 		member, err = s.GuildMember(m.GuildID, authorID)
 		if err != nil {
-			fmt.Println("Error getting guild member:", err)
+			fmt.Printf("Error getting guild member (%s): %s\n", authorID, err)
 		}
 	}
 
