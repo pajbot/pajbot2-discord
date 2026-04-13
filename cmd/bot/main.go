@@ -993,6 +993,12 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 		return
 	}
 
+	messageAge := time.Since(creationTime)
+	if messageAge > 300*24*time.Hour {
+		fmt.Printf("Skipping message deletion log of %s since it's too old (%s)\n", m.ID, messageAge)
+		return
+	}
+
 	// Try to get member
 	var member *discordgo.Member
 	if authorID != "unknown" {
