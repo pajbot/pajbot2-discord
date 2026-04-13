@@ -1025,7 +1025,7 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 	} else {
 		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 			Name:   "Author",
-			Value:  "unknown",
+			Value:  fmt.Sprintf("unknown (<@%s>)", authorID),
 			Inline: true,
 		})
 	}
@@ -1037,6 +1037,16 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 		Name:   "Channel",
 		Value:  "<#" + m.ChannelID + ">",
+		Inline: true,
+	})
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "Message ID",
+		Value:  m.ID,
+		Inline: true,
+	})
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "Message creation time",
+		Value:  creationTime.Format("2006-01-02 15:04:05"),
 		Inline: true,
 	})
 	s.ChannelMessageSendEmbed(targetChannel, embed)
