@@ -993,12 +993,24 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 		return
 	}
 
+	messageAge := time.Since(creationTime)
+	if messageAge > 300*24*time.Hour {
+		fmt.Printf("Skipping message deletion log of %s since it's too old (%s)\n", m.ID, messageAge)
+		return
+	}
+
 	// Try to get member
 	var member *discordgo.Member
 	if authorID != "unknown" {
 		member, err = s.GuildMember(m.GuildID, authorID)
 		if err != nil {
-			fmt.Println("Error getting guild member:", err)
+			fmt.Printf("Error getting guild member (%s): %s\n", authorID, err)
+			if m.Message != nil {
+				fmt.Printf("test from message delete a: %#v\n", *m.Message)
+			}
+			if m.BeforeDelete != nil {
+				fmt.Printf("test from message delete b: %#v\n", *m.BeforeDelete)
+			}
 		}
 	}
 
@@ -1019,7 +1031,7 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 	} else {
 		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 			Name:   "Author",
-			Value:  "unknown",
+			Value:  fmt.Sprintf("unknown (<@%s>)", authorID),
 			Inline: true,
 		})
 	}
@@ -1031,6 +1043,16 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 		Name:   "Channel",
 		Value:  "<#" + m.ChannelID + ">",
+		Inline: true,
+	})
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "Message ID",
+		Value:  m.ID,
+		Inline: true,
+	})
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "Message creation time",
+		Value:  creationTime.Format("2006-01-02 15:04:05"),
 		Inline: true,
 	})
 	s.ChannelMessageSendEmbed(targetChannel, embed)
