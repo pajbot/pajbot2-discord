@@ -533,6 +533,9 @@ func main() {
 
 	bot.AddHandler(app.onMessage)
 	bot.AddHandler(onMessageDeleted)
+	bot.AddHandler(onThreadCreated)
+	bot.AddHandler(onThreadDeleted)
+	bot.AddHandler(onThreadUpdated)
 	bot.AddHandler(app.onMessageEdited)
 	bot.AddHandler(onUserBanned)
 	bot.AddHandler(onUserLeft)
@@ -603,11 +606,128 @@ func pushMessageIntoDatabase(m *discordgo.Message) (err error) {
 	return
 }
 
+func pushThreadMessageIntoDatabase(m *discordgo.Message, threadTitle string) (err error) {
+	const query = `INSERT INTO discord_messages (id, content, author_id, thread_title) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET content=$2, thread_title=$4`
+	authorID := "unknown"
+	if m.Author != nil {
+		authorID = m.Author.ID
+	}
+	_, err = sqlClient.Exec(query, m.ID, m.Content, authorID, threadTitle)
+	return
+}
+
 func getMessageFromDatabase(messageID string) (content string, authorID string, err error) {
 	const query = `SELECT content, author_id FROM discord_messages WHERE id=$1`
 	row := sqlClient.QueryRow(query, messageID)
 	err = row.Scan(&content, &authorID)
 	return
+}
+
+func getThreadMessageFromDatabase(messageID string) (content string, authorID string, threadTitle string, err error) {
+	const query = `SELECT content, author_id, thread_title FROM discord_messages WHERE id=$1`
+	row := sqlClient.QueryRow(query, messageID)
+	err = row.Scan(&content, &authorID, &threadTitle)
+	return
+}
+
+func storeMessageAttachmentsLocally(m *discordgo.Message) error {
+	for _, a := range m.Attachments {
+		attachmentsMutex.Lock()
+		attachments[m.ID] = append(attachments[m.ID], a)
+		attachmentsMutex.Unlock()
+		attachmentLocalPath := filepath.Join("attachments", fmt.Sprintf("%s-%s", a.ID, a.Filename))
+
+		if _, err := os.Stat(attachmentLocalPath); os.IsNotExist(err) {
+			resp, err := http.Get(a.URL)
+			if err != nil {
+				return fmt.Errorf("error getting attachment at url %s: %w", a.URL, err)
+			}
+			defer resp.Body.Close()
+
+			f, err := os.Create(attachmentLocalPath)
+			if err != nil {
+				return fmt.Errorf("error opening attachment file locally %s: %w", attachmentLocalPath, err)
+			}
+			defer f.Close()
+			if _, err = io.Copy(f, resp.Body); err != nil {
+				return fmt.Errorf("error copying data from request to file: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func storeMessageLocally(m *discordgo.Message) error {
+	if err := storeMessageAttachmentsLocally(m); err != nil {
+		return err
+	}
+
+	if err := pushMessageIntoDatabase(m); err != nil {
+		return fmt.Errorf("error pushing message into database: %w", err)
+	}
+
+	return nil
+}
+
+func storeThreadStarterMessageLocally(m *discordgo.Message, threadTitle string) error {
+	if err := storeMessageAttachmentsLocally(m); err != nil {
+		return err
+	}
+
+	if err := pushThreadMessageIntoDatabase(m, threadTitle); err != nil {
+		return fmt.Errorf("error pushing thread starter message into database: %w", err)
+	}
+
+	return nil
+}
+
+func fetchThreadStarterMessage(s *discordgo.Session, thread *discordgo.Channel) (*discordgo.Message, error) {
+	channelIDs := []string{thread.ID}
+	if thread.ParentID != "" {
+		channelIDs = append(channelIDs, thread.ParentID)
+	}
+
+	var err error
+	for _, channelID := range channelIDs {
+		var message *discordgo.Message
+		message, err = s.ChannelMessage(channelID, thread.ID)
+		if err == nil {
+			return message, nil
+		}
+	}
+
+	return nil, err
+}
+
+func onThreadStart(s *discordgo.Session, thread *discordgo.Channel) {
+	if thread == nil || !thread.IsThread() {
+		return
+	}
+
+	switch thread.Type {
+	case discordgo.ChannelTypeGuildPublicThread, discordgo.ChannelTypeGuildNewsThread:
+	default:
+		return
+	}
+
+	message, err := fetchThreadStarterMessage(s, thread)
+	if err != nil {
+		fmt.Printf("on thread start: Error getting starter message '%s': %s\n", thread.ID, err)
+		return
+	}
+
+	if err := storeThreadStarterMessageLocally(message, thread.Name); err != nil {
+		log.Println("Error storing thread starter message:", err)
+	}
+}
+
+func onThreadCreated(s *discordgo.Session, m *discordgo.ThreadCreate) {
+	onThreadStart(s, m.Channel)
+}
+
+func onThreadUpdated(s *discordgo.Session, m *discordgo.ThreadUpdate) {
+	onThreadStart(s, m.Channel)
 }
 
 var attachments = map[string][]*discordgo.MessageAttachment{}
@@ -749,38 +869,8 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
-	for _, a := range m.Message.Attachments {
-		attachmentsMutex.Lock()
-		attachments[m.Message.ID] = append(attachments[m.Message.ID], a)
-		attachmentsMutex.Unlock()
-		attachmentLocalPath := filepath.Join("attachments", fmt.Sprintf("%s-%s", a.ID, a.Filename))
-
-		if _, err := os.Stat(attachmentLocalPath); os.IsNotExist(err) {
-			resp, err := http.Get(a.URL)
-			if err != nil {
-				fmt.Println("Error getting avatar at url", a.URL)
-				return
-			}
-			defer resp.Body.Close()
-
-			f, err := os.Create(attachmentLocalPath)
-			if err != nil {
-				fmt.Println("Error opening avatar file locally", attachmentLocalPath)
-				return
-			}
-			defer f.Close()
-			_, err = io.Copy(f, resp.Body)
-			if err != nil {
-				fmt.Println("Error copying data from request to file")
-				return
-			}
-		}
-	}
-
-	// push message into database
-	err := pushMessageIntoDatabase(m.Message)
-	if err != nil {
-		log.Println("Error pushing message into databasE:", err)
+	if err := storeMessageLocally(m.Message); err != nil {
+		log.Println(err)
 	}
 
 	if m.Author.ID == s.State.User.ID {
@@ -1051,9 +1141,103 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 	})
 	s.ChannelMessageSendEmbed(targetChannel, embed)
 	for i, file := range attachmentsToSend {
-		content := fmt.Sprintf("Attachment %d/%d for message %s\nPosted by Name: %s#%s - ID: %s", i+1, len(attachmentsToSend), m.ID, member.User.Username, member.User.Discriminator, authorID)
+		content := fmt.Sprintf("Attachment %d/%d for message %s\nPosted by ID: %s", i+1, len(attachmentsToSend), m.ID, authorID)
+		if member != nil {
+			content = fmt.Sprintf("Attachment %d/%d for message %s\nPosted by Name: %s#%s - ID: %s", i+1, len(attachmentsToSend), m.ID, member.User.Username, member.User.Discriminator, authorID)
+		}
 		s.ChannelFileSendWithMessage(targetChannel, content, file.filename, file.reader)
 	}
+}
+
+func onThreadDeleted(s *discordgo.Session, m *discordgo.ThreadDelete) {
+	messageContent, authorID, threadTitle, err := getThreadMessageFromDatabase(m.ID)
+	if err != nil {
+		fmt.Printf("on thread deleted: Error getting full message '%s': %s\n", m.ID, err)
+		return
+	}
+
+	if threadTitle == "" {
+		threadTitle = m.Name
+	}
+
+	targetChannel := channels.Get(m.GuildID, "action-log")
+	if targetChannel == "" {
+		fmt.Println("No channel set up for action log")
+		return
+	}
+
+	if targetChannel == m.ID || targetChannel == m.ParentID {
+		return
+	}
+
+	creationTime, err := utils.CreationTime(m.ID)
+	if err != nil {
+		panic(err)
+	}
+
+	messageAge := time.Since(creationTime)
+	if messageAge > 300*24*time.Hour {
+		fmt.Printf("Skipping thread deletion log of %s since it's too old (%s)\n", m.ID, messageAge)
+		return
+	}
+
+	var member *discordgo.Member
+	if authorID != "unknown" {
+		member, err = s.GuildMember(m.GuildID, authorID)
+		if err != nil {
+			fmt.Printf("Error getting guild member (%s): %s\n", authorID, err)
+		}
+	}
+
+	embed := &discordgo.MessageEmbed{
+		Title: "Thread deleted",
+	}
+
+	if member != nil {
+		payload := fmt.Sprintf("<@%s> - Name: %s#%s - ID: %s", authorID, member.User.Username, member.User.Discriminator, authorID)
+		if member.Nick != "" {
+			payload += " Nickname: " + member.Nick
+		}
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "Author",
+			Value:  payload,
+			Inline: true,
+		})
+	} else {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "Author",
+			Value:  fmt.Sprintf("unknown (<@%s>)", authorID),
+			Inline: true,
+		})
+	}
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "Content",
+		Value:  strings.Replace(messageContent, "`", "", -1),
+		Inline: true,
+	})
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "Forum/Thread",
+		Value:  threadTitle,
+		Inline: true,
+	})
+	if m.ParentID != "" {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "Parent channel",
+			Value:  "<#" + m.ParentID + ">",
+			Inline: true,
+		})
+	}
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "Message ID",
+		Value:  m.ID,
+		Inline: true,
+	})
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "Message creation time",
+		Value:  creationTime.Format("2006-01-02 15:04:05"),
+		Inline: true,
+	})
+	s.ChannelMessageSendEmbed(targetChannel, embed)
 }
 
 func onUserBanned(s *discordgo.Session, m *discordgo.GuildBanAdd) {
