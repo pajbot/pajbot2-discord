@@ -279,7 +279,7 @@ func formatAltConnections(altConnections []*connection.DiscordConnection) string
 			b.WriteString(", ")
 		}
 
-		b.WriteString(fmt.Sprintf("did: `%s`, dname: `%s`", c.DiscordUserID, utils.EscapeCodeBlock(c.DiscordUserName)))
+		fmt.Fprintf(&b, "did: `%s`, dname: `%s`", c.DiscordUserID, utils.EscapeCodeBlock(c.DiscordUserName))
 
 		first = false
 	}
@@ -803,7 +803,7 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 			})
 			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 				Name:   "Content",
-				Value:  strings.Replace(m.Content, "`", "", -1),
+				Value:  strings.ReplaceAll(m.Content, "`", ""),
 				Inline: true,
 			})
 			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
@@ -849,7 +849,7 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 			})
 			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 				Name:   "Content",
-				Value:  strings.Replace(m.Content, "`", "", -1),
+				Value:  strings.ReplaceAll(m.Content, "`", ""),
 				Inline: true,
 			})
 			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
@@ -957,13 +957,13 @@ func (a *App) onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) 
 	if messageContent != "" {
 		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 			Name:   "Old message",
-			Value:  strings.Replace(messageContent, "`", "", -1),
+			Value:  strings.ReplaceAll(messageContent, "`", ""),
 			Inline: true,
 		})
 	}
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 		Name:   "New message",
-		Value:  strings.Replace(m.Content, "`", "", -1),
+		Value:  strings.ReplaceAll(m.Content, "`", ""),
 		Inline: true,
 	})
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
@@ -1006,7 +1006,7 @@ func (a *App) onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) 
 			})
 			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 				Name:   "Content",
-				Value:  strings.Replace(m.Content, "`", "", -1),
+				Value:  strings.ReplaceAll(m.Content, "`", ""),
 				Inline: true,
 			})
 			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
@@ -1121,7 +1121,7 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 	}
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 		Name:   "Content",
-		Value:  strings.Replace(messageContent, "`", "", -1),
+		Value:  strings.ReplaceAll(messageContent, "`", ""),
 		Inline: true,
 	})
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
@@ -1212,7 +1212,7 @@ func onThreadDeleted(s *discordgo.Session, m *discordgo.ThreadDelete) {
 	}
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 		Name:   "Content",
-		Value:  strings.Replace(messageContent, "`", "", -1),
+		Value:  strings.ReplaceAll(messageContent, "`", ""),
 		Inline: true,
 	})
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
