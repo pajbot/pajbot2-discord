@@ -80,6 +80,19 @@ func init() {
 						},
 					},
 				},
+				{
+					Type:        discordgo.ApplicationCommandOptionSubCommand,
+					Name:        "action-log-ignored-channels",
+					Description: "Set channels that the action log should ignore",
+					Options: []*discordgo.ApplicationCommandOption{
+						{
+							Name:        "channels",
+							Description: "Comma-separated raw channel IDs",
+							Type:        discordgo.ApplicationCommandOptionString,
+							Required:    false,
+						},
+					},
+				},
 			},
 			DefaultMemberPermissions: &perms,
 		},
@@ -97,6 +110,8 @@ func init() {
 					valuePajbotHost(s, i, subcommand.Options)
 				case "member-role-mode":
 					valueMemberRoleMode(s, i, subcommand.Options)
+				case "action-log-ignored-channels":
+					valueActionLogIgnoredChannels(s, i, subcommand.Options)
 				}
 			}
 		},
@@ -152,6 +167,21 @@ func valueGet(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	} else {
 		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 			Name:   "Pajbot host",
+			Value:  "Unset",
+			Inline: false,
+		})
+	}
+
+	ignoredChannels := serverconfig.GetActionLogIgnoredChannels(i.GuildID)
+	if len(ignoredChannels) > 0 {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "Action log ignored channels",
+			Value:  formatChannelMentions(ignoredChannels),
+			Inline: false,
+		})
+	} else {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "Action log ignored channels",
 			Value:  "Unset",
 			Inline: false,
 		})
@@ -272,4 +302,56 @@ func valueMemberRoleMode(s *discordgo.Session, i *discordgo.InteractionCreate, o
 			},
 		})
 	}
+}
+
+// valueActionLogIgnoredChannels updates the list of channels whose action-log activity should not be logged.
+func valueActionLogIgnoredChannels(s *discordgo.Session, i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) {
+	if len(options) == 0 {
+		if err := serverconfig.RemoveActionLogIgnoredChannels(sqlClient, i.GuildID); err != nil {
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: fmt.Sprintf("Error: %s", err),
+				},
+			})
+		} else {
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Removed",
+				},
+			})
+		}
+		return
+	}
+
+	rawChannels := strings.Split(options[0].StringValue(), ",")
+
+	if err := serverconfig.SetActionLogIgnoredChannels(sqlClient, i.GuildID, rawChannels); err != nil {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: fmt.Sprintf("Error: %s", err),
+			},
+		})
+		return
+	}
+
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: fmt.Sprintf("Updated to %s", formatChannelMentions(serverconfig.GetActionLogIgnoredChannels(i.GuildID))),
+		},
+	})
+}
+
+// formatChannelMentions renders channel IDs as Discord channel mentions for responses.
+func formatChannelMentions(channelIDs []string) string {
+	mentions := make([]string, 0, len(channelIDs))
+
+	for _, channelID := range channelIDs {
+		mentions = append(mentions, fmt.Sprintf("<#%s>", channelID))
+	}
+
+	return strings.Join(mentions, ", ")
 }
