@@ -22,7 +22,7 @@ func init() {
 	})
 
 	if err != nil {
-		log.Fatalf("Error initializing helix client:", err)
+		log.Fatalf("Error initializing helix client: %s", err)
 	}
 
 	go initAppAccessToken(helixClient, rdyHelixClient)

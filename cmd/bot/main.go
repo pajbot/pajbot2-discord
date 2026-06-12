@@ -509,7 +509,7 @@ func main() {
 		}
 
 		// TODO: include which action it matched
-		app.postToActionLog(message.DiscordMessage.GuildID, "Deleting message because it matched a filter",
+		app.postToActionLog(message.DiscordMessage.GuildID, message.DiscordMessage.ChannelID, "Deleting message because it matched a filter",
 			[]*discordgo.MessageEmbedField{
 				{
 					Name:   "Message",
@@ -735,7 +735,11 @@ var attachmentsMutex = sync.Mutex{}
 
 const noInvites = true
 
-func (a *App) postToActionLog(guildID, title string, fields []*discordgo.MessageEmbedField) {
+func (a *App) postToActionLog(guildID, sourceChannelID, title string, fields []*discordgo.MessageEmbedField) {
+	if serverconfig.ActionLogChannelIgnored(guildID, sourceChannelID) {
+		return
+	}
+
 	targetChannel := channels.Get(guildID, "action-log")
 	if targetChannel == "" {
 		fmt.Println("No channel set up for action log")
@@ -813,6 +817,9 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 			})
 
 			targetChannel := channels.Get(m.GuildID, "action-log")
+			if serverconfig.ActionLogChannelIgnored(m.GuildID, m.ChannelID) {
+				return
+			}
 			if targetChannel == "" {
 				fmt.Println("No channel set up for moderation actions")
 				return
@@ -859,6 +866,9 @@ func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 			})
 
 			targetChannel := channels.Get(m.GuildID, "action-log")
+			if serverconfig.ActionLogChannelIgnored(m.GuildID, m.ChannelID) {
+				return
+			}
 			if targetChannel == "" {
 				fmt.Println("No channel set up for moderation actions")
 				return
@@ -918,66 +928,67 @@ func (a *App) onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) 
 		fmt.Printf("on message edit: Error getting full message '%s': %s\n", m.ID, err)
 		return
 	}
-	targetChannel := channels.Get(m.GuildID, "action-log")
-	if targetChannel == "" {
-		fmt.Println("No channel set up for action log")
-		return
-	}
+	if !serverconfig.ActionLogChannelIgnored(m.GuildID, m.ChannelID) {
+		targetChannel := channels.Get(m.GuildID, "action-log")
+		if targetChannel == "" {
+			fmt.Println("No channel set up for action log")
+		} else {
+			// Try to get member
+			var member *discordgo.Member
+			if authorID != "unknown" {
+				member, err = s.GuildMember(m.GuildID, authorID)
+				if err != nil {
+					fmt.Println("Error getting guild member of edited message:", err)
+				}
+			}
 
-	// Try to get member
-	var member *discordgo.Member
-	if authorID != "unknown" {
-		member, err = s.GuildMember(m.GuildID, authorID)
-		if err != nil {
-			fmt.Println("Error getting guild member of edited message:", err)
+			embed := &discordgo.MessageEmbed{
+				Title: "Message edited",
+			}
+
+			if member != nil {
+				payload := fmt.Sprintf("<@%s> - Name: %s#%s - ID: %s", authorID, member.User.Username, member.User.Discriminator, authorID)
+				if member.Nick != "" {
+					payload += " Nickname: " + member.Nick
+				}
+				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+					Name:   "Author",
+					Value:  payload,
+					Inline: true,
+				})
+			} else {
+				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+					Name:   "Author",
+					Value:  "unknown",
+					Inline: true,
+				})
+			}
+			if messageContent != "" {
+				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+					Name:   "Old message",
+					Value:  strings.ReplaceAll(messageContent, "`", ""),
+					Inline: true,
+				})
+			}
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+				Name:   "New message",
+				Value:  strings.ReplaceAll(m.Content, "`", ""),
+				Inline: true,
+			})
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+				Name:   "Channel",
+				Value:  "<#" + m.ChannelID + ">",
+				Inline: true,
+			})
+			idTime, idTimeErr := discordgo.SnowflakeTimestamp(m.ID)
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+				Name:   "Snowflake/ID",
+				Value:  fmt.Sprintf("%s: %s %s", m.ID, idTime, idTimeErr),
+				Inline: true,
+			})
+			s.ChannelMessageSendEmbed(targetChannel, embed)
 		}
 	}
-
-	embed := &discordgo.MessageEmbed{
-		Title: "Message edited",
-	}
-
-	if member != nil {
-		payload := fmt.Sprintf("<@%s> - Name: %s#%s - ID: %s", authorID, member.User.Username, member.User.Discriminator, authorID)
-		if member.Nick != "" {
-			payload += " Nickname: " + member.Nick
-		}
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-			Name:   "Author",
-			Value:  payload,
-			Inline: true,
-		})
-	} else {
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-			Name:   "Author",
-			Value:  "unknown",
-			Inline: true,
-		})
-	}
-	if messageContent != "" {
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-			Name:   "Old message",
-			Value:  strings.ReplaceAll(messageContent, "`", ""),
-			Inline: true,
-		})
-	}
-	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-		Name:   "New message",
-		Value:  strings.ReplaceAll(m.Content, "`", ""),
-		Inline: true,
-	})
-	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-		Name:   "Channel",
-		Value:  "<#" + m.ChannelID + ">",
-		Inline: true,
-	})
-	idTime, idTimeErr := discordgo.SnowflakeTimestamp(m.ID)
-	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-		Name:   "Snowflake/ID",
-		Value:  fmt.Sprintf("%s: %s %s", m.ID, idTime, idTimeErr),
-		Inline: true,
-	})
-	s.ChannelMessageSendEmbed(targetChannel, embed)
 
 	err = pushMessageIntoDatabase(m.Message)
 	if err != nil {
@@ -1016,6 +1027,9 @@ func (a *App) onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) 
 			})
 
 			targetChannel := channels.Get(m.GuildID, "action-log")
+			if serverconfig.ActionLogChannelIgnored(m.GuildID, m.ChannelID) {
+				return
+			}
 			if targetChannel == "" {
 				fmt.Println("No channel set up for moderation actions")
 				return
@@ -1070,6 +1084,9 @@ func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
 			messageContent = m.BeforeDelete.Content
 			authorID = m.BeforeDelete.Author.ID
 		}
+	}
+	if serverconfig.ActionLogChannelIgnored(m.GuildID, m.ChannelID) {
+		return
 	}
 
 	targetChannel := channels.Get(m.GuildID, "action-log")
@@ -1158,6 +1175,9 @@ func onThreadDeleted(s *discordgo.Session, m *discordgo.ThreadDelete) {
 
 	if threadTitle == "" {
 		threadTitle = m.Name
+	}
+	if serverconfig.ActionLogChannelIgnored(m.GuildID, m.ID) || serverconfig.ActionLogChannelIgnored(m.GuildID, m.ParentID) {
+		return
 	}
 
 	targetChannel := channels.Get(m.GuildID, "action-log")

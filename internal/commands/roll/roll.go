@@ -1,7 +1,6 @@
 package roll
 
 import (
-	"fmt"
 	"math/rand"
 	"strconv"
 
@@ -35,8 +34,7 @@ func (c *Command) Run(s *discordgo.Session, m *discordgo.MessageCreate, parts []
 		number, err := strconv.Atoi(parts[1])
 		if err == nil && number >= 1 {
 			v := 1 + rand.Intn(number)
-			response := fmt.Sprintf("%d", v)
-			utils.Reply(s, m, response)
+			utils.Replyf(s, m, "%d", v)
 		}
 	}
 	return pkg.CommandResultUserCooldown
