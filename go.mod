@@ -1,6 +1,6 @@
 module github.com/pajbot/pajbot2-discord
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/bwmarrin/discordgo v0.29.0
@@ -14,7 +14,6 @@ require (
 	github.com/pajlada/lidl-normalize v1.0.0
 	github.com/pajlada/stupidmigration v0.1.0
 	golang.org/x/oauth2 v0.36.0
-	honnef.co/go/tools v0.7.0
 )
 
 require (
@@ -27,5 +26,8 @@ require (
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
-	golang.org/x/tools v0.44.0 // indirect
+	golang.org/x/tools v0.44.1-0.20260420230617-19499e7caabc // indirect
+	honnef.co/go/tools v0.8.1 // indirect
 )
+
+tool honnef.co/go/tools/cmd/staticcheck
