@@ -1,10 +1,77 @@
 package connection
 
 import (
+	cryptorand "crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"slices"
+	"sync"
+
+	"github.com/pajbot/pajbot2-discord/pkg/utils"
 )
+
+type PendingConnection struct {
+	ConnectionID   string
+	DiscordUserID  string
+	DiscordGuildID string
+	State          string
+}
+
+type TwitchValidateResponse struct {
+	Login  string `json:"login"`
+	UserID string `json:"user_id"`
+}
+
+var connectionIDMutex = sync.Mutex{}
+var connectionIDs = map[string]*PendingConnection{}
+
+// registerPendingConnection returns the connection ID for this user
+func RegisterPendingConnection(discordUserID, discordGuildID string) string {
+	connectionIDMutex.Lock()
+	defer connectionIDMutex.Unlock()
+	connectionID, err := utils.GenerateRandomStringURLSafe(12)
+	if err != nil {
+		panic(err)
+	}
+
+	var tokenBytes [255]byte
+	if _, err := cryptorand.Read(tokenBytes[:]); err != nil {
+		panic(err)
+	}
+
+	connectionIDs[connectionID] = &PendingConnection{
+		ConnectionID:   connectionID,
+		DiscordUserID:  discordUserID,
+		DiscordGuildID: discordGuildID,
+		State:          hex.EncodeToString(tokenBytes[:]),
+	}
+
+	return connectionID
+}
+
+func GetPendingConnection(connectionID string) *PendingConnection {
+	connectionIDMutex.Lock()
+	defer connectionIDMutex.Unlock()
+	return connectionIDs[connectionID]
+}
+
+func GetPendingConnectionByState(state string) (string, *PendingConnection) {
+	connectionIDMutex.Lock()
+	defer connectionIDMutex.Unlock()
+	for connectionID, pendingConnection := range connectionIDs {
+		if pendingConnection.State == state {
+			return connectionID, pendingConnection
+		}
+	}
+	return "", nil
+}
+
+func UnregisterPendingConnection(connectionID string) {
+	connectionIDMutex.Lock()
+	defer connectionIDMutex.Unlock()
+	delete(connectionIDs, connectionID)
+}
 
 type DiscordConnection struct {
 	DiscordUserID   string

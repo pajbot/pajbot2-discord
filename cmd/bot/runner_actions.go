@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/pajbot/pajbot2-discord/internal/db"
 	"github.com/pajbot/pajbot2-discord/pkg"
 )
 
@@ -22,7 +23,7 @@ func startActionRunner(ctx context.Context, bot *discordgo.Session) {
 		case <-ticker.C:
 			now := time.Now()
 			const query = `SELECT id, action, timepoint FROM discord_queue ORDER BY timepoint DESC LIMIT 30;`
-			rows, err := sqlClient.Query(query)
+			rows, err := db.SQLClient.Query(query)
 			if err != nil {
 				fmt.Println("err:", err)
 				continue
@@ -78,7 +79,7 @@ func startActionRunner(ctx context.Context, bot *discordgo.Session) {
 			}
 
 			for _, actionID := range actionsToRemove {
-				sqlClient.Exec("DELETE FROM discord_queue WHERE id=$1", actionID)
+				db.SQLClient.Exec("DELETE FROM discord_queue WHERE id=$1", actionID)
 			}
 		}
 	}
