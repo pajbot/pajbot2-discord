@@ -611,7 +611,7 @@ func handleMemberJoin(s *discordgo.Session, m *discordgo.GuildMemberAdd, sqlClie
 
 				connectionURL := fmt.Sprintf("%s/login?code=%s", config.Domain, connectionID)
 				privacyPolicy := fmt.Sprintf("%s/legal/privacy-policy", config.Domain)
-				termsOfService := fmt.Sprintf("%s/legal/termsOfService", config.Domain)
+				termsOfService := fmt.Sprintf("%s/legal/terms-of-service", config.Domain)
 
 				manualVerificationChannel := channels.Get(m.GuildID, "manual-verification")
 				messageContent := fmt.Sprintf("Hi! You need to authenticate to join the Discord. Please click [this link](<%s>) and sign in with your Twitch account to continue.\n\nPlease review our [privacy policy](<%s>) and [terms of service](<%s>) before proceeding.\n\nIf you run into any issues, ask for help in the <#%s> channel, or rejoin the server to try again. If the channel says **No Access** you are either already verified, or you are not in the server.", connectionURL, privacyPolicy, termsOfService, manualVerificationChannel)
