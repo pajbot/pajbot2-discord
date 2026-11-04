@@ -7,6 +7,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/pajbot/pajbot2-discord/internal/channels"
+	"github.com/pajbot/pajbot2-discord/internal/db"
 	"github.com/pajbot/pajbot2-discord/internal/mute"
 	"github.com/pajbot/pajbot2-discord/internal/serverconfig"
 	"github.com/pajbot/pajbot2-discord/pkg/utils"
@@ -23,7 +24,7 @@ func startUnmuterRunner(ctx context.Context, bot *discordgo.Session) {
 			return
 
 		case <-ticker.C:
-			unmutedUsers, err := mute.ExpireMutes(bot, sqlClient)
+			unmutedUsers, err := mute.ExpireMutes(bot, db.SQLClient)
 			if err != nil {
 				fmt.Println("err:", err)
 			}

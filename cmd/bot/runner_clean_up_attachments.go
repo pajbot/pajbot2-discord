@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+const (
+	timeToKeepLocalAttachments    = 10 * time.Minute
+	timeBetweenAttachmentCleanups = 15 * time.Minute
+)
+
 func cleanUpAttachments() {
 	// attachmentsMutex.Lock()
 	// for i, a := range attachments {

@@ -2,28 +2,21 @@ package main
 
 import (
 	"context"
-	cryptorand "crypto/rand"
 	"database/sql"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io"
-	"log"
 	"math/rand"
-	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"regexp"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/pajbot/pajbot2-discord/internal/app"
 	"github.com/pajbot/pajbot2-discord/internal/channels"
 	"github.com/pajbot/pajbot2-discord/internal/config"
 	"github.com/pajbot/pajbot2-discord/internal/connection"
+	"github.com/pajbot/pajbot2-discord/internal/db"
 	"github.com/pajbot/pajbot2-discord/internal/filter"
 	"github.com/pajbot/pajbot2-discord/internal/mute"
 	"github.com/pajbot/pajbot2-discord/internal/roles"
@@ -31,14 +24,10 @@ import (
 	"github.com/pajbot/pajbot2-discord/internal/slashcommands"
 	"github.com/pajbot/pajbot2-discord/internal/twitchstreamannouncer"
 	"github.com/pajbot/pajbot2-discord/internal/values"
-	"github.com/pajbot/pajbot2-discord/pkg"
 	"github.com/pajbot/pajbot2-discord/pkg/commands"
 	"github.com/pajbot/pajbot2-discord/pkg/utils"
 	sharedutils "github.com/pajbot/utils"
 	normalize "github.com/pajlada/lidl-normalize"
-	"github.com/pajlada/stupidmigration"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/twitch"
 
 	_ "github.com/lib/pq"
 
@@ -67,326 +56,15 @@ import (
 	_ "github.com/pajbot/pajbot2-discord/internal/commands/userid"
 )
 
-const (
-	timeToKeepLocalAttachments    = 10 * time.Minute
-	timeBetweenAttachmentCleanups = 15 * time.Minute
-)
-
-type pendingConnection struct {
-	connectionID   string
-	discordUserID  string
-	discordGuildID string
-	state          string
-}
-
-var approvalForceTwitch = oauth2.SetAuthURLParam("force_verify", "true")
-
-var connectionIDMutex = sync.Mutex{}
-var connectionIDs = map[string]*pendingConnection{}
-
-// registerPendingConnection returns the connection ID for this user
-func registerPendingConnection(discordUserID, discordGuildID string) string {
-	connectionIDMutex.Lock()
-	defer connectionIDMutex.Unlock()
-	connectionID, err := utils.GenerateRandomStringURLSafe(12)
-	if err != nil {
-		panic(err)
-	}
-
-	var tokenBytes [255]byte
-	if _, err := cryptorand.Read(tokenBytes[:]); err != nil {
-		panic(err)
-	}
-
-	connectionIDs[connectionID] = &pendingConnection{
-		connectionID:   connectionID,
-		discordUserID:  discordUserID,
-		discordGuildID: discordGuildID,
-		state:          hex.EncodeToString(tokenBytes[:]),
-	}
-
-	return connectionID
-}
-
-func getPendingConnection(connectionID string) *pendingConnection {
-	connectionIDMutex.Lock()
-	defer connectionIDMutex.Unlock()
-	return connectionIDs[connectionID]
-}
-func getPendingConnectionByState(state string) (string, *pendingConnection) {
-	connectionIDMutex.Lock()
-	defer connectionIDMutex.Unlock()
-	for connectionID, pendingConnection := range connectionIDs {
-		if pendingConnection.state == state {
-			return connectionID, pendingConnection
-		}
-	}
-	return "", nil
-}
-
-func unregisterPendingConnection(connectionID string) {
-	connectionIDMutex.Lock()
-	defer connectionIDMutex.Unlock()
-	delete(connectionIDs, connectionID)
-}
-
-type twitchValidateResponse struct {
-	Login  string `json:"login"`
-	UserID string `json:"user_id"`
-}
-
-var sqlClient *sql.DB
-
-func init() {
-	var err error
-	sqlClient, err = sql.Open("postgres", config.DSN)
-	if err != nil {
-		fmt.Println("Unable to connect to mysql", err)
-		os.Exit(1)
-	}
-
-	err = sqlClient.Ping()
-	if err != nil {
-		fmt.Println("Unable to ping mysql", err)
-		os.Exit(1)
-	}
-
-	err = stupidmigration.Migrate("migrations", sqlClient)
-	if err != nil {
-		fmt.Println("Unable to run SQL migrations", err)
-		os.Exit(1)
-	}
-
-	commands.SQLClient = sqlClient
-
-	serverconfig.Load(sqlClient)
-
-	slashcommands.Initialize(sqlClient)
-}
-
-type App struct {
-	bot *discordgo.Session
-
-	filterRunner *filter.Runner
-}
-
-func (a *App) registerUser(pendingConnection *pendingConnection, twitchUser twitchValidateResponse) {
-	defer unregisterPendingConnection(pendingConnection.connectionID)
-	membersRole := roles.GetSingle(pendingConnection.discordGuildID, "member")
-	if membersRole == "" {
-		fmt.Println("Error applying members role: There's no members role in the server ??")
-		return
-	}
-
-	if err := a.bot.GuildMemberRoleAdd(pendingConnection.discordGuildID, pendingConnection.discordUserID, membersRole); err != nil {
-		fmt.Println("Error adding members role to user:", pendingConnection, twitchUser, err)
-	}
-
-	existingConnection, err := connection.Get(sqlClient, pendingConnection.discordGuildID, pendingConnection.discordUserID)
-	if err != nil {
-		fmt.Println("error getting existing connection:", pendingConnection, twitchUser, err)
-		return
-	}
-
-	member, err := a.bot.GuildMember(pendingConnection.discordGuildID, pendingConnection.discordUserID)
-	if err != nil {
-		fmt.Println("error getting member:", pendingConnection, twitchUser, err)
-		return
-	}
-
-	if err := connection.Upsert(sqlClient, pendingConnection.discordGuildID, pendingConnection.discordUserID, member.User.Username, twitchUser.UserID, twitchUser.Login); err != nil {
-		fmt.Println("Error upserting into db:", pendingConnection, twitchUser, err)
-		return
-	}
-
-	a.postConnectionUpdate(member, existingConnection, twitchUser)
-
-	if err := roles.Grant(a.bot, pendingConnection.discordGuildID, pendingConnection.discordUserID, "member"); err != nil {
-		fmt.Println("Error adding Members role to user:", err)
-	} else {
-		fmt.Printf("Granted Members role to %s (%s)\n", member.User.Username, member.User.ID)
-	}
-}
-
-func formatConnection(connection *connection.DiscordConnection) string {
-	if connection == nil {
-		panic("connection may not be nil in formatConnection")
-	}
-
-	return fmt.Sprintf("`%s` (TUID `%s`)", utils.EscapeCodeBlock(connection.TwitchUserLogin), connection.TwitchUserID)
-}
-
-func (a *App) postConnectionUpdate(member *discordgo.Member, existingConnection *connection.DiscordConnection, twitchUser twitchValidateResponse) {
-	embed := &discordgo.MessageEmbed{
-		Title: "User Connection Update",
-	}
-	targetChannel := channels.Get(member.GuildID, "connection-updates", "system-messages")
-	if targetChannel == "" {
-		fmt.Println("No channel set up for connection updates")
-		return
-	}
-
-	embed.Thumbnail = &discordgo.MessageEmbedThumbnail{
-		URL:    member.User.AvatarURL("64x64"),
-		Width:  64,
-		Height: 64,
-	}
-
-	payload := utils.MentionMember(member)
-	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: "Name", Value: payload})
-
-	fmt.Println(existingConnection)
-
-	if existingConnection != nil {
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-			Name:   "Previous connection",
-			Value:  formatConnection(existingConnection),
-			Inline: false,
-		})
-	}
-
-	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-		Name:   "New connection",
-		Value:  fmt.Sprintf("`%s` (TUID `%s`)", utils.EscapeCodeBlock(twitchUser.Login), twitchUser.UserID),
-		Inline: false,
-	})
-
-	altConnections, err := connection.GetByTwitchID(sqlClient, twitchUser.UserID, member.GuildID, member.User.ID)
-	if err != nil {
-		fmt.Println("Error getting alt connections:", err)
-	} else {
-		if len(altConnections) > 0 {
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:   "Alt Detection",
-				Value:  formatAltConnections(altConnections),
-				Inline: false,
-			})
-		}
-	}
-
-	if _, err := a.bot.ChannelMessageSendEmbed(targetChannel, embed); err != nil {
-		fmt.Println("Error sending message embed:", err)
-	}
-}
-
-func formatAltConnections(altConnections []*connection.DiscordConnection) string {
-	var b strings.Builder
-
-	first := true
-
-	for _, c := range altConnections {
-		if !first {
-			b.WriteString(", ")
-		}
-
-		fmt.Fprintf(&b, "did: `%s`, dname: `%s`", c.DiscordUserID, utils.EscapeCodeBlock(c.DiscordUserName))
-
-		first = false
-	}
-
-	return b.String()
-}
-
-func (a *App) startWebServer(ctx context.Context) error {
-	scopes := []string{}
-
-	oauth2Config := &oauth2.Config{
-		ClientID:     config.TwitchClientID,
-		ClientSecret: config.TwitchClientSecret,
-		Scopes:       scopes,
-		Endpoint:     twitch.Endpoint,
-		RedirectURL:  config.TwitchRedirectURI,
-	}
-
-	// Redirect user to twitch page
-	http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
-		connectionID := r.FormValue("code")
-		if connectionID == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, "missing connection ID")
-			return
-		}
-
-		// Validate code
-		pendingConnection := getPendingConnection(connectionID)
-		if pendingConnection == nil {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, "bad connection ID")
-			return
-		}
-
-		fmt.Println("Redirecting login for", pendingConnection)
-
-		http.Redirect(w, r, oauth2Config.AuthCodeURL(pendingConnection.state, approvalForceTwitch), http.StatusTemporaryRedirect)
-	})
-
-	http.HandleFunc("/login/authorized", func(w http.ResponseWriter, r *http.Request) {
-		state := r.FormValue("state")
-		if state == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, "missing state")
-			return
-		}
-
-		// Validate state
-		connectionID, pendingConnection := getPendingConnectionByState(state)
-		if pendingConnection == nil {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, "bad state")
-			return
-		}
-
-		token, err := oauth2Config.Exchange(ctx, r.FormValue("code"))
-		if err != nil {
-			fmt.Println("Error exchanging code", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, "internal server error")
-			unregisterPendingConnection(connectionID)
-			return
-		}
-
-		go func() {
-			// Fetch user ID
-			req, err := http.NewRequest("GET", "https://id.twitch.tv/oauth2/validate", nil)
-			if err != nil {
-				fmt.Println("error making request to validate twitch token", err)
-				unregisterPendingConnection(connectionID)
-				return
-			}
-
-			req.Header.Add("Authorization", fmt.Sprintf("OAuth %s", token.AccessToken))
-
-			res, err := http.DefaultClient.Do(req)
-			if err != nil {
-				fmt.Println("error in request to validate twitch token", err)
-				unregisterPendingConnection(connectionID)
-				return
-			}
-
-			structuredResponse := twitchValidateResponse{}
-
-			if err := json.NewDecoder(res.Body).Decode(&structuredResponse); err != nil {
-				fmt.Println("error decoding validate twitch token response:", err)
-				unregisterPendingConnection(connectionID)
-				return
-			}
-
-			go a.registerUser(pendingConnection, structuredResponse)
-		}()
-	})
-
-	go func() {
-		if err := http.ListenAndServe(config.WebListenAddr, nil); err != nil {
-			fmt.Println("Error in http listen and serve:", err)
-		}
-	}()
-
-	return nil
-}
-
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	commands.SQLClient = db.SQLClient
+
+	serverconfig.Load(db.SQLClient)
+
+	slashcommands.Initialize(db.SQLClient)
 
 	<-rdyHelixClient
 	fmt.Println("Twitch API initialized")
@@ -401,14 +79,9 @@ func main() {
 
 	bot.State.MaxMessageCount = 1000
 
-	var app App
+	app := app.New(bot, db.SQLClient)
 
-	app.bot = bot
-	app.filterRunner = filter.NewRunner()
-
-	// app.filterRunner.Dry = true
-
-	app.filterRunner.AddFilter(&filter.Delete{
+	app.FilterRunner.AddFilter(&filter.Delete{
 		Checker: func(content string) bool {
 			requiredParts := []string{"larvalabs.net", "cryptopunks", "nft", "tokens"}
 
@@ -432,7 +105,7 @@ func main() {
 		},
 	})
 
-	app.filterRunner.AddFilter(&filter.Delete{
+	app.FilterRunner.AddFilter(&filter.Delete{
 		Checker: func(content string) bool {
 			requiredParts := []string{"cryptopunks", "wallet", "free"}
 
@@ -456,7 +129,7 @@ func main() {
 		},
 	})
 
-	app.filterRunner.AddFilter(&filter.Delete{
+	app.FilterRunner.AddFilter(&filter.Delete{
 		Checker: func(content string) bool {
 			requiredParts := []string{"ethereum", "airdrop", "claim"}
 
@@ -480,7 +153,7 @@ func main() {
 		},
 	})
 
-	app.filterRunner.AddFilter(&filter.DeleteAdvanced{
+	app.FilterRunner.AddFilter(&filter.DeleteAdvanced{
 		Checker: func(message *discordgo.Message) bool {
 			bannedHosts := []string{
 				"tenor.com",
@@ -502,14 +175,14 @@ func main() {
 		},
 	})
 
-	app.filterRunner.OnDelete(func(message filter.Message) {
+	app.FilterRunner.OnDelete(func(message filter.Message) {
 		fmt.Println("delete message...")
 		if err := bot.ChannelMessageDelete(message.DiscordMessage.ChannelID, message.DiscordMessage.ID); err != nil {
 			fmt.Println("Error deleting message:", err)
 		}
 
 		// TODO: include which action it matched
-		app.postToActionLog(message.DiscordMessage.GuildID, message.DiscordMessage.ChannelID, "Deleting message because it matched a filter",
+		app.PostToActionLog(message.DiscordMessage.GuildID, message.DiscordMessage.ChannelID, "Deleting message because it matched a filter",
 			[]*discordgo.MessageEmbedField{
 				{
 					Name:   "Message",
@@ -518,25 +191,25 @@ func main() {
 				},
 			})
 	})
-	app.filterRunner.OnMute(func(message filter.Message) {
+	app.FilterRunner.OnMute(func(message filter.Message) {
 		fmt.Println("mute user...")
 	})
-	app.filterRunner.OnBan(func(message filter.Message) {
+	app.FilterRunner.OnBan(func(message filter.Message) {
 		fmt.Println("ban user...")
 	})
 
-	// app.filterRunner.OnDelete(...)
-	// app.filterRunner.OnBan(...)
-	// app.filterRunner.OnMute(...)
+	// app.FilterRunner.OnDelete(...)
+	// app.FilterRunner.OnBan(...)
+	// app.FilterRunner.OnMute(...)
 
-	go twitchstreamannouncer.Start(ctx, helixClient, bot, sqlClient)
+	go twitchstreamannouncer.Start(ctx, helixClient, bot, db.SQLClient)
 
-	bot.AddHandler(app.onMessage)
-	bot.AddHandler(onMessageDeleted)
-	bot.AddHandler(onThreadCreated)
+	bot.AddHandler(app.OnMessage)
+	bot.AddHandler(app.OnMessageDeleted)
+	bot.AddHandler(app.OnThreadCreated)
 	bot.AddHandler(onThreadDeleted)
-	bot.AddHandler(onThreadUpdated)
-	bot.AddHandler(app.onMessageEdited)
+	bot.AddHandler(app.OnThreadUpdated)
+	bot.AddHandler(app.OnMessageEdited)
 	bot.AddHandler(onUserBanned)
 	bot.AddHandler(onUserLeft)
 	bot.AddHandler(onMessageReactionAdded)
@@ -546,10 +219,10 @@ func main() {
 		twitchstreamannouncer.Register(m.Guild.ID)
 	})
 	bot.AddHandler(func(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
-		onMemberJoin(s, m, sqlClient)
+		onMemberJoin(s, m, db.SQLClient)
 	})
 
-	if err := app.startWebServer(ctx); err != nil {
+	if err := app.StartWebServer(ctx); err != nil {
 		panic(err)
 	}
 
@@ -578,7 +251,7 @@ func main() {
 	// Clean up attachments occasionally
 	go startCleanUpAttachments(ctx)
 
-	go app.filterRunner.Run(ctx)
+	go app.FilterRunner.Run(ctx)
 
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
@@ -596,578 +269,10 @@ func main() {
 	fmt.Println("Deleted slash commands")
 }
 
-func pushMessageIntoDatabase(m *discordgo.Message) (err error) {
-	const query = `INSERT INTO discord_messages (id, content, author_id) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET content=$2`
-	authorID := "unknown"
-	if m.Author != nil {
-		authorID = m.Author.ID
-	}
-	_, err = sqlClient.Exec(query, m.ID, m.Content, authorID)
-	return
-}
-
-func pushThreadMessageIntoDatabase(m *discordgo.Message, threadTitle string) (err error) {
-	const query = `INSERT INTO discord_messages (id, content, author_id, thread_title) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET content=$2, thread_title=$4`
-	authorID := "unknown"
-	if m.Author != nil {
-		authorID = m.Author.ID
-	}
-	_, err = sqlClient.Exec(query, m.ID, m.Content, authorID, threadTitle)
-	return
-}
-
-func getMessageFromDatabase(messageID string) (content string, authorID string, err error) {
-	const query = `SELECT content, author_id FROM discord_messages WHERE id=$1`
-	row := sqlClient.QueryRow(query, messageID)
-	err = row.Scan(&content, &authorID)
-	return
-}
-
-func getThreadMessageFromDatabase(messageID string) (content string, authorID string, threadTitle string, err error) {
-	const query = `SELECT content, author_id, thread_title FROM discord_messages WHERE id=$1`
-	row := sqlClient.QueryRow(query, messageID)
-	err = row.Scan(&content, &authorID, &threadTitle)
-	return
-}
-
-func storeMessageAttachmentsLocally(m *discordgo.Message) error {
-	for _, a := range m.Attachments {
-		attachmentsMutex.Lock()
-		attachments[m.ID] = append(attachments[m.ID], a)
-		attachmentsMutex.Unlock()
-		attachmentLocalPath := filepath.Join("attachments", fmt.Sprintf("%s-%s", a.ID, a.Filename))
-
-		if _, err := os.Stat(attachmentLocalPath); os.IsNotExist(err) {
-			resp, err := http.Get(a.URL)
-			if err != nil {
-				return fmt.Errorf("error getting attachment at url %s: %w", a.URL, err)
-			}
-			defer resp.Body.Close()
-
-			f, err := os.Create(attachmentLocalPath)
-			if err != nil {
-				return fmt.Errorf("error opening attachment file locally %s: %w", attachmentLocalPath, err)
-			}
-			defer f.Close()
-			if _, err = io.Copy(f, resp.Body); err != nil {
-				return fmt.Errorf("error copying data from request to file: %w", err)
-			}
-		}
-	}
-
-	return nil
-}
-
-func storeMessageLocally(m *discordgo.Message) error {
-	if err := storeMessageAttachmentsLocally(m); err != nil {
-		return err
-	}
-
-	if err := pushMessageIntoDatabase(m); err != nil {
-		return fmt.Errorf("error pushing message into database: %w", err)
-	}
-
-	return nil
-}
-
-func storeThreadStarterMessageLocally(m *discordgo.Message, threadTitle string) error {
-	if err := storeMessageAttachmentsLocally(m); err != nil {
-		return err
-	}
-
-	if err := pushThreadMessageIntoDatabase(m, threadTitle); err != nil {
-		return fmt.Errorf("error pushing thread starter message into database: %w", err)
-	}
-
-	return nil
-}
-
-func fetchThreadStarterMessage(s *discordgo.Session, thread *discordgo.Channel) (*discordgo.Message, error) {
-	channelIDs := []string{thread.ID}
-	if thread.ParentID != "" {
-		channelIDs = append(channelIDs, thread.ParentID)
-	}
-
-	var err error
-	for _, channelID := range channelIDs {
-		var message *discordgo.Message
-		message, err = s.ChannelMessage(channelID, thread.ID)
-		if err == nil {
-			return message, nil
-		}
-	}
-
-	return nil, err
-}
-
-func onThreadStart(s *discordgo.Session, thread *discordgo.Channel) {
-	if thread == nil || !thread.IsThread() {
-		return
-	}
-
-	switch thread.Type {
-	case discordgo.ChannelTypeGuildPublicThread, discordgo.ChannelTypeGuildNewsThread:
-	default:
-		return
-	}
-
-	message, err := fetchThreadStarterMessage(s, thread)
-	if err != nil {
-		fmt.Printf("on thread start: Error getting starter message '%s': %s\n", thread.ID, err)
-		return
-	}
-
-	if err := storeThreadStarterMessageLocally(message, thread.Name); err != nil {
-		log.Println("Error storing thread starter message:", err)
-	}
-}
-
-func onThreadCreated(s *discordgo.Session, m *discordgo.ThreadCreate) {
-	onThreadStart(s, m.Channel)
-}
-
-func onThreadUpdated(s *discordgo.Session, m *discordgo.ThreadUpdate) {
-	onThreadStart(s, m.Channel)
-}
-
-var attachments = map[string][]*discordgo.MessageAttachment{}
-var attachmentsMutex = sync.Mutex{}
-
 const noInvites = true
 
-func (a *App) postToActionLog(guildID, sourceChannelID, title string, fields []*discordgo.MessageEmbedField) {
-	if serverconfig.ActionLogChannelIgnored(guildID, sourceChannelID) {
-		return
-	}
-
-	targetChannel := channels.Get(guildID, "action-log")
-	if targetChannel == "" {
-		fmt.Println("No channel set up for action log")
-		return
-	}
-
-	embed := &discordgo.MessageEmbed{
-		Title:  title,
-		Fields: fields,
-	}
-
-	a.bot.ChannelMessageSendEmbed(targetChannel, embed)
-}
-
-func (a *App) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
-	// Ignore messages from bots
-	if m.Message.Author.Bot {
-		return
-	}
-
-	// Remove nitro colors if the user doesn't have nitro
-	if hasAccess, _ := utils.MemberInRoles(s, m.GuildID, m.Author.ID, "nitrobooster"); !hasAccess {
-		colorRoles := utils.ColorRoles(s, m.GuildID)
-		messageTimestamp, messageTimestampErr := discordgo.SnowflakeTimestamp(m.Message.ID)
-		anyRemoved, err := utils.RemoveNitroColors(s, m.GuildID, m.Author.ID, colorRoles)
-		if err != nil {
-			fmt.Println("Error Removing nitro from", m.Author.ID, messageTimestamp, messageTimestampErr, err)
-		} else {
-			if anyRemoved {
-				fmt.Println("Removing nitro from", m.Author.ID, messageTimestamp, messageTimestampErr)
-			}
-		}
-	}
-
-	if m.GuildID == forsenServerID {
-		if strings.Contains(m.Message.Content, "bajscran") {
-			if err := s.MessageReactionAdd(m.ChannelID, m.ID, "⬅️"); err != nil {
-				fmt.Println("error adding left:", err)
-			}
-			if err := s.MessageReactionAdd(m.ChannelID, m.ID, "➡️"); err != nil {
-				fmt.Println("error adding right:", err)
-			}
-		}
-	}
-
-	if inviteCode, ok := utils.ResolveInviteCode(m.Message.Content); ok && inviteCode != "forsen" {
-		hasAccess, err := utils.MemberInRoles(s, m.GuildID, m.Author.ID, "minimod")
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		if !hasAccess {
-			err := s.ChannelMessageDelete(m.Message.ChannelID, m.Message.ID)
-			if err != nil {
-				fmt.Println("Error deleting message")
-			}
-			embed := &discordgo.MessageEmbed{
-				Title: "Message deleted because it contained a server invite",
-			}
-			payload := fmt.Sprintf("<@%s> - Name: %s#%s - ID: %s", m.Author.ID, m.Author.Username, m.Author.Discriminator, m.Author.ID)
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:   "Author",
-				Value:  payload,
-				Inline: true,
-			})
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:   "Content",
-				Value:  strings.ReplaceAll(m.Content, "`", ""),
-				Inline: true,
-			})
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:   "Channel",
-				Value:  "<#" + m.ChannelID + ">",
-				Inline: true,
-			})
-
-			targetChannel := channels.Get(m.GuildID, "action-log")
-			if serverconfig.ActionLogChannelIgnored(m.GuildID, m.ChannelID) {
-				return
-			}
-			if targetChannel == "" {
-				fmt.Println("No channel set up for moderation actions")
-				return
-			}
-
-			// Announce mute in moderation-action channel
-			s.ChannelMessageSendEmbed(targetChannel, embed)
-			return
-		}
-	}
-
-	// Remove messages containing "display links"
-	linkRegex := regexp.MustCompile(`\[(.*?)\]\((https?://\S+)\)`)
-	matches := linkRegex.FindAllStringSubmatch(m.Message.Content, -1)
-	if len(matches) > 0 {
-		hasAccess, err := utils.MemberInRoles(s, m.GuildID, m.Author.ID, "minimod")
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		if !hasAccess {
-			err := s.ChannelMessageDelete(m.Message.ChannelID, m.Message.ID)
-			if err != nil {
-				fmt.Println("Error deleting message")
-			}
-			embed := &discordgo.MessageEmbed{
-				Title: "Message deleted because it contained a link with a different display text",
-			}
-			payload := fmt.Sprintf("<@%s> - Name: %s#%s - ID: %s", m.Author.ID, m.Author.Username, m.Author.Discriminator, m.Author.ID)
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:   "Author",
-				Value:  payload,
-				Inline: true,
-			})
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:   "Content",
-				Value:  strings.ReplaceAll(m.Content, "`", ""),
-				Inline: true,
-			})
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:   "Channel",
-				Value:  "<#" + m.ChannelID + ">",
-				Inline: true,
-			})
-
-			targetChannel := channels.Get(m.GuildID, "action-log")
-			if serverconfig.ActionLogChannelIgnored(m.GuildID, m.ChannelID) {
-				return
-			}
-			if targetChannel == "" {
-				fmt.Println("No channel set up for moderation actions")
-				return
-			}
-
-			s.ChannelMessageSendEmbed(targetChannel, embed)
-			return
-		}
-	}
-
-	if err := storeMessageLocally(m.Message); err != nil {
-		log.Println(err)
-	}
-
-	if m.Author.ID == s.State.User.ID {
-		return
-	}
-
-	autoReactIDs := serverconfig.GetAutoReact(m.GuildID, m.ChannelID)
-	for _, emojiID := range autoReactIDs {
-		err := s.MessageReactionAdd(m.ChannelID, m.ID, emojiID)
-		if err != nil {
-			fmt.Println("ERR REACT:", err)
-		}
-	}
-
-	a.filterRunner.ScanMessage(filter.Message{
-		DiscordMessage: m.Message,
-	})
-
-	c, parts := commands.Match(m.Content)
-	if c != nil {
-		if cmd, ok := c.(pkg.Command); ok {
-			id := m.ChannelID + m.Author.ID
-			if cmd.HasUserIDCooldown(id) {
-				return
-			}
-
-			switch cmd.Run(s, m, parts) {
-			case pkg.CommandResultUserCooldown:
-				cmd.AddUserIDCooldown(id)
-			case pkg.CommandResultGlobalCooldown:
-				cmd.AddGlobalCooldown()
-			case pkg.CommandResultFullCooldown:
-				cmd.AddUserIDCooldown(id)
-				cmd.AddGlobalCooldown()
-			}
-		} else if f, ok := c.(func(s *discordgo.Session, m *discordgo.MessageCreate, parts []string)); ok {
-			f(s, m, parts)
-		}
-	}
-}
-
-func (a *App) onMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) {
-	messageContent, authorID, err := getMessageFromDatabase(m.ID)
-	if err != nil {
-		fmt.Printf("on message edit: Error getting full message '%s': %s\n", m.ID, err)
-		return
-	}
-	if !serverconfig.ActionLogChannelIgnored(m.GuildID, m.ChannelID) {
-		targetChannel := channels.Get(m.GuildID, "action-log")
-		if targetChannel == "" {
-			fmt.Println("No channel set up for action log")
-		} else {
-			// Try to get member
-			var member *discordgo.Member
-			if authorID != "unknown" {
-				member, err = s.GuildMember(m.GuildID, authorID)
-				if err != nil {
-					fmt.Println("Error getting guild member of edited message:", err)
-				}
-			}
-
-			embed := &discordgo.MessageEmbed{
-				Title: "Message edited",
-			}
-
-			if member != nil {
-				payload := fmt.Sprintf("<@%s> - Name: %s#%s - ID: %s", authorID, member.User.Username, member.User.Discriminator, authorID)
-				if member.Nick != "" {
-					payload += " Nickname: " + member.Nick
-				}
-				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-					Name:   "Author",
-					Value:  payload,
-					Inline: true,
-				})
-			} else {
-				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-					Name:   "Author",
-					Value:  "unknown",
-					Inline: true,
-				})
-			}
-			if messageContent != "" {
-				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-					Name:   "Old message",
-					Value:  strings.ReplaceAll(messageContent, "`", ""),
-					Inline: true,
-				})
-			}
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:   "New message",
-				Value:  strings.ReplaceAll(m.Content, "`", ""),
-				Inline: true,
-			})
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:   "Channel",
-				Value:  "<#" + m.ChannelID + ">",
-				Inline: true,
-			})
-			idTime, idTimeErr := discordgo.SnowflakeTimestamp(m.ID)
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:   "Snowflake/ID",
-				Value:  fmt.Sprintf("%s: %s %s", m.ID, idTime, idTimeErr),
-				Inline: true,
-			})
-			s.ChannelMessageSendEmbed(targetChannel, embed)
-		}
-	}
-
-	err = pushMessageIntoDatabase(m.Message)
-	if err != nil {
-		log.Println("Error pushing message into databasE (from edit):", err)
-	}
-
-	if inviteCode, ok := utils.ResolveInviteCode(m.Message.Content); ok && inviteCode != "forsen" {
-		hasAccess, err := utils.MemberInRoles(s, m.GuildID, m.Author.ID, "minimod")
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		if !hasAccess {
-			err := s.ChannelMessageDelete(m.Message.ChannelID, m.Message.ID)
-			if err != nil {
-				fmt.Println("Error deleting message")
-			}
-			embed := &discordgo.MessageEmbed{
-				Title: "Message deleted because it contained a server invite",
-			}
-			payload := fmt.Sprintf("<@%s> - Name: %s#%s - ID: %s", m.Author.ID, m.Author.Username, m.Author.Discriminator, m.Author.ID)
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:   "Author",
-				Value:  payload,
-				Inline: true,
-			})
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:   "Content",
-				Value:  strings.ReplaceAll(m.Content, "`", ""),
-				Inline: true,
-			})
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:   "Channel",
-				Value:  "<#" + m.ChannelID + ">",
-				Inline: true,
-			})
-
-			targetChannel := channels.Get(m.GuildID, "action-log")
-			if serverconfig.ActionLogChannelIgnored(m.GuildID, m.ChannelID) {
-				return
-			}
-			if targetChannel == "" {
-				fmt.Println("No channel set up for moderation actions")
-				return
-			}
-
-			// Announce mute in moderation-action channel
-			s.ChannelMessageSendEmbed(targetChannel, embed)
-			return
-		}
-	}
-	a.filterRunner.ScanMessage(filter.Message{
-		DiscordMessage: m.Message,
-	})
-}
-
-type localAttachment struct {
-	reader   io.Reader
-	filename string
-}
-
-// TODO: Don't list messages deleted from or by ourselves (this bot account)
-func onMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
-	creationTime, err := utils.CreationTime(m.ID)
-	if err != nil {
-		panic(err)
-	}
-	var attachmentsToSend []localAttachment
-	if time.Now().Before(creationTime.Add(timeToKeepLocalAttachments)) {
-		if messageAttachments, ok := attachments[m.Message.ID]; ok {
-			for _, a := range messageAttachments {
-				attachmentLocalPath := filepath.Join("attachments", fmt.Sprintf("%s-%s", a.ID, a.Filename))
-				file, err := os.Open(attachmentLocalPath)
-				if err != nil {
-					fmt.Println("Error opening file", err)
-					continue
-				}
-
-				attachmentsToSend = append(attachmentsToSend, localAttachment{
-					reader:   file,
-					filename: a.Filename,
-				})
-
-				// TODO: Wait with posting the message deleted message until we're done downloading all attachments
-			}
-		}
-	}
-	var authorID string
-	messageContent, authorID, err := getMessageFromDatabase(m.ID)
-	if err != nil {
-		fmt.Println("on message deleted: Error getting full message")
-		if m.BeforeDelete != nil {
-			messageContent = m.BeforeDelete.Content
-			authorID = m.BeforeDelete.Author.ID
-		}
-	}
-	if serverconfig.ActionLogChannelIgnored(m.GuildID, m.ChannelID) {
-		return
-	}
-
-	targetChannel := channels.Get(m.GuildID, "action-log")
-	if targetChannel == "" {
-		fmt.Println("No channel set up for action log")
-		return
-	}
-
-	if targetChannel == m.ChannelID {
-		// Skipping messages deleted from the action log channel itself
-		return
-	}
-
-	messageAge := time.Since(creationTime)
-	if messageAge > 300*24*time.Hour {
-		fmt.Printf("Skipping message deletion log of %s since it's too old (%s)\n", m.ID, messageAge)
-		return
-	}
-
-	// Try to get member
-	var member *discordgo.Member
-	if authorID != "unknown" {
-		member, err = s.GuildMember(m.GuildID, authorID)
-		if err != nil {
-			fmt.Printf("Error getting guild member (%s): %s\n", authorID, err)
-		}
-	}
-
-	embed := &discordgo.MessageEmbed{
-		Title: "Message deleted",
-	}
-
-	if member != nil {
-		payload := fmt.Sprintf("<@%s> - Name: %s#%s - ID: %s", authorID, member.User.Username, member.User.Discriminator, authorID)
-		if member.Nick != "" {
-			payload += " Nickname: " + member.Nick
-		}
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-			Name:   "Author",
-			Value:  payload,
-			Inline: true,
-		})
-	} else {
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-			Name:   "Author",
-			Value:  fmt.Sprintf("unknown (<@%s>)", authorID),
-			Inline: true,
-		})
-	}
-	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-		Name:   "Content",
-		Value:  strings.ReplaceAll(messageContent, "`", ""),
-		Inline: true,
-	})
-	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-		Name:   "Channel",
-		Value:  "<#" + m.ChannelID + ">",
-		Inline: true,
-	})
-	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-		Name:   "Message ID",
-		Value:  m.ID,
-		Inline: true,
-	})
-	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-		Name:   "Message creation time",
-		Value:  creationTime.Format("2006-01-02 15:04:05"),
-		Inline: true,
-	})
-	s.ChannelMessageSendEmbed(targetChannel, embed)
-	for i, file := range attachmentsToSend {
-		content := fmt.Sprintf("Attachment %d/%d for message %s\nPosted by ID: %s", i+1, len(attachmentsToSend), m.ID, authorID)
-		if member != nil {
-			content = fmt.Sprintf("Attachment %d/%d for message %s\nPosted by Name: %s#%s - ID: %s", i+1, len(attachmentsToSend), m.ID, member.User.Username, member.User.Discriminator, authorID)
-		}
-		s.ChannelFileSendWithMessage(targetChannel, content, file.filename, file.reader)
-	}
-}
-
 func onThreadDeleted(s *discordgo.Session, m *discordgo.ThreadDelete) {
-	messageContent, authorID, threadTitle, err := getThreadMessageFromDatabase(m.ID)
+	messageContent, authorID, threadTitle, err := db.GetThreadMessageFromDatabase(m.ID)
 	if err != nil {
 		fmt.Printf("on thread deleted: Error getting full message '%s': %s\n", m.ID, err)
 		return
@@ -1388,7 +493,6 @@ const reactionBye = "👋"
 
 // forsen members role
 // const membersRole = `825354461102473226`
-const forsenServerID = `97034666673975296`
 
 func onMessageReactionAdded(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 	targetChannel := channels.Get(m.GuildID, "weeb-channel")
@@ -1496,19 +600,21 @@ func handleMemberJoin(s *discordgo.Session, m *discordgo.GuildMemberAdd, sqlClie
 					fmt.Printf("Granted Members role to %s (%s)\n", m.User.Username, m.User.ID)
 				}
 			} else {
+				// TODO :DEDUPE THIS
 				// User had no existing connection
 
 				// Generate connection ID
-				connectionID := registerPendingConnection(m.User.ID, m.GuildID)
+				connectionID := connection.RegisterPendingConnection(m.User.ID, m.GuildID)
 
 				// Put that connection ID in a memory map
-				registerPendingConnection(connectionID, m.User.ID)
+				connection.RegisterPendingConnection(connectionID, m.User.ID)
 
-				// TODO: Generate URL based on config stuff
 				connectionURL := fmt.Sprintf("%s/login?code=%s", config.Domain, connectionID)
+				privacyPolicy := fmt.Sprintf("%s/legal/privacy-policy", config.Domain)
+				termsOfService := fmt.Sprintf("%s/legal/termsOfService", config.Domain)
 
 				manualVerificationChannel := channels.Get(m.GuildID, "manual-verification")
-				messageContent := fmt.Sprintf("Hi! You need to authenticate to join the Discord. Please click [this link](<%s>) and sign in with your Twitch account to continue.\n\nIf you run into any issues, ask for help in the <#%s> channel, or rejoin the server to try again.", connectionURL, manualVerificationChannel)
+				messageContent := fmt.Sprintf("Hi! You need to authenticate to join the Discord. Please click [this link](<%s>) and sign in with your Twitch account to continue.\n\nPlease review our [privacy policy](<%s>) and [terms of service](<%s>) before proceeding.\n\nIf you run into any issues, ask for help in the <#%s> channel, or rejoin the server to try again. If the channel says **No Access** you are either already verified, or you are not in the server.", connectionURL, privacyPolicy, termsOfService, manualVerificationChannel)
 
 				// Send the user a DM with a link to where they can authenticate
 				// TODO: could this be done in a channel where we show a message only to them somehow?
