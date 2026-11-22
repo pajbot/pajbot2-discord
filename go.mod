@@ -11,23 +11,23 @@ require (
 	github.com/pajbot/commandmatcher v1.0.1
 	github.com/pajbot/testhelper v1.0.0
 	github.com/pajbot/utils v1.0.0
-	github.com/pajlada/lidl-normalize v1.0.0
+	github.com/pajlada/lidl-normalize v1.0.1
 	github.com/pajlada/stupidmigration v0.1.0
-	golang.org/x/oauth2 v0.37.0
+	golang.org/x/oauth2 v0.38.0
 )
 
 require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
-	golang.org/x/crypto v0.52.0 // indirect
-	golang.org/x/exp/typeparams v0.0.0-20260312153236-7ab1446f8b90 // indirect
-	golang.org/x/mod v0.35.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
-	golang.org/x/tools v0.44.1-0.20260420230617-19499e7caabc // indirect
-	honnef.co/go/tools v0.8.1 // indirect
+	golang.org/x/crypto v0.59.0 // indirect
+	golang.org/x/exp/typeparams v0.0.0-20261121134650-e1094eeca1b5 // indirect
+	golang.org/x/mod v0.43.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
+	golang.org/x/tools v0.53.0 // indirect
+	honnef.co/go/tools v0.8.2 // indirect
 )
 
 tool honnef.co/go/tools/cmd/staticcheck
