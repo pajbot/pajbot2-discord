@@ -591,8 +591,8 @@ func (a *App) OnMessageEdited(s *discordgo.Session, m *discordgo.MessageUpdate) 
 	})
 }
 
-// TODO: Don't list messages deleted from or by ourselves (this bot account)
 func (a *App) OnMessageDeleted(s *discordgo.Session, m *discordgo.MessageDelete) {
+	// TODO: Don't list messages deleted from or by ourselves (this bot account)
 	creationTime, err := utils.CreationTime(m.ID)
 	if err != nil {
 		panic(err)

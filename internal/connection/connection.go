@@ -26,7 +26,7 @@ type TwitchValidateResponse struct {
 var connectionIDMutex = sync.Mutex{}
 var connectionIDs = map[string]*PendingConnection{}
 
-// registerPendingConnection returns the connection ID for this user
+// RegisterPendingConnection returns the connection ID for this user
 func RegisterPendingConnection(discordUserID, discordGuildID string) string {
 	connectionIDMutex.Lock()
 	defer connectionIDMutex.Unlock()
